@@ -1,0 +1,33 @@
+{
+  "@renku_data_type": "renku.domain_model.project.Project",
+  "@renku_oid": "project",
+  "agent_version": "1.7.1",
+  "annotations": [],
+  "automated_update": true,
+  "creator": {
+    "@renku_data_type": "renku.domain_model.provenance.agent.Person",
+    "@renku_data_value": {
+      "affiliation": null,
+      "alternate_name": null,
+      "email": "carlo.ferrigno@unige.ch",
+      "id": "mailto:carlo.ferrigno@unige.ch",
+      "name": "Carlo Ferrigno"
+    }
+  },
+  "date_created": {
+    "@renku_data_type": "datetime.datetime",
+    "@renku_data_value": "2022-09-23T16:57:30+00:00"
+  },
+  "description": "",
+  "id": "/projects/carlo.ferrigno/ap-lab-i-2022",
+  "immutable_template_files": [],
+  "keywords": [],
+  "minimum_renku_version": "1.7.0",
+  "name": "AP-Lab-I-2022",
+  "template_id": "python-minimal",
+  "template_metadata": "{\"__template_source__\": \"https://github.com/SwissDataScienceCenter/renku-project-template\", \"__template_ref__\": \"0.3.4\", \"__template_id__\": \"python-minimal\", \"__namespace__\": \"carlo.ferrigno\", \"__automated_update__\": true, \"__repository__\": \"https://renkulab.io/gitlab\", \"__sanitized_project_name__\": \"ap-lab-i-2022\", \"__project_slug__\": \"carlo.ferrigno/ap-lab-i-2022\", \"__project_description__\": \"\", \"__renku_version__\": \"1.7.1\", \"name\": \"AP-Lab-I-2022\", \"__name__\": \"AP-Lab-I-2022\", \"__template_version__\": \"fc5953b87e53ec5bd5a3288ce6660b39a9f0107c\"}",
+  "template_ref": "0.3.4",
+  "template_source": "https://github.com/SwissDataScienceCenter/renku-project-template",
+  "template_version": "fc5953b87e53ec5bd5a3288ce6660b39a9f0107c",
+  "version": 9
+}
