@@ -11,6 +11,13 @@ or if you need the command line
 make run
 ```
 
+Then
+```bash
+git commit "MYFILE" -m "MYMESSAGE"
+git push
+```
+
+
 ## Use in Renku (need testing)
 Run it with enough storage and 8 Gb memory, better at least 1 CPU
 
