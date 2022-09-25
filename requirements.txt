@@ -1,0 +1,17 @@
+matplotlib
+jupyter
+jupyter_contrib_nbextensions
+
+photutils
+astropy!=3.0.*,!=3.1,!=3.1.1,>=2.0.12
+pandas
+black
+papermill
+ipynbname
+GitPython
+-e git+https://gitlab.astro.unige.ch/ferrigno/nustar-pipeline.git#egg=nustarpipeline
+-e git+https://gitlab.astro.unige.ch/ferrigno/pysas.git#egg=pyxmmsas
+-e git+https://github.com/ferrigno/jpjs9.git#egg=jpjs9
+socketIO-client
+pyjs9
+pyLCSIM

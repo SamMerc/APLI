@@ -1,7 +1,6 @@
 # For finding latest versions of the base image see
 # https://github.com/SwissDataScienceCenter/renkulab-docker
-ARG RENKU_BASE_IMAGE=renku/renkulab-py:3.9-0.12.0
-FROM ${RENKU_BASE_IMAGE}
+FROM carloferrigno/nustar-pipeline:0.1.0
 
 # Uncomment and adapt if code is to be included in the image
 # COPY src /code/src
@@ -18,11 +17,8 @@ FROM ${RENKU_BASE_IMAGE}
 # USER ${NB_USER}
 
 # install the python dependencies
-COPY requirements.txt environment.yml /tmp/
-RUN conda env update -q -f /tmp/environment.yml && \
-    /opt/conda/bin/pip install -r /tmp/requirements.txt && \
-    conda clean -y --all && \
-    conda env export -n "root"
+COPY requirements.txt  /tmp/
+RUN pip install -r /tmp/requirements.txt --upgrade
 
 # RENKU_VERSION determines the version of the renku CLI
 # that will be used in this image. To find the latest version,
