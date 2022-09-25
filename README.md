@@ -1,5 +1,21 @@
 # AP-Lab-I-2022
 
+## Use with git
+```bash
+git clone git@renkulab.io:carlo.ferrigno/ap-lab-i-2022.git 
+make build
+JUPYTER_PORT=4444 make notebook
+```
+or if you need the command line
+```bash
+make run
+```
+
+## Use in Renku (need testing)
+Run it with enough storage and 8 Gb memory, better at least 1 CPU
+
+-------------------
+
 ## Introduction
 
 This is a Renku project - basically a git repository with some
