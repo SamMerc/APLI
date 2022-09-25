@@ -18,7 +18,7 @@ FROM carloferrigno/nustar-pipeline:0.1.0
 
 # install the python dependencies
 COPY requirements.txt  /tmp/
-RUN pip install -r /tmp/requirements.txt --upgrade
+RUN pip install -r /tmp/requirements.txt --upgrade 
 
 # RENKU_VERSION determines the version of the renku CLI
 # that will be used in this image. To find the latest version,
