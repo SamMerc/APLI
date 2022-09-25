@@ -1,0 +1,117 @@
+\documentclass[a4paper]{article}
+
+\usepackage[USenglish]{babel}
+\usepackage[a4paper]{geometry}
+\usepackage{amsmath}
+%\usepackage{amssymb}
+\usepackage{graphicx}
+%\usepackage{fullpage}
+\usepackage{xcolor}
+\usepackage{natbib}
+\usepackage{hyperref}
+%\usepackage{pdfpages}
+
+\def \src {Cen\,X-3}
+
+\newcommand{\mynote}[3] {
+	\textbf{\textcolor{#2}{ #3 - #1}}
+}
+
+\newcommand{\todo}[1] {\mynote{TODO}{blue}{#1}}
+\newcommand{\cf}[1] {\mynote{CF}{red}{#1}}
+\newcommand{\jg}[1] {\mynote{JG}{purple}{#1}}
+\input{macros.tex}
+
+\begin{document}
+    \begin{titlepage}
+
+    \newcommand{\HRule}{\rule{\linewidth}{0.8mm}}
+    \center
+
+    \textsc{\LARGE University of Geneva}\\[1.5cm]
+    \textsc{\Large Astrophysics Lab report}\\[0.9cm]
+    \textsc{\Large \today}\\[1.5cm]
+
+    \HRule \\[0.4cm]
+        {\LARGE \textsf{{\textbf{ My TITLE}}}}\\[0.4cm]
+    \HRule \\[1.5cm]
+
+
+    \begin{minipage}{1.0\textwidth}
+       \begin{flushleft} \large
+          \emph{By:}\\
+          \textsc{My Name}
+          \hfill
+       \end{flushleft}
+    \end{minipage}
+
+    \begin{minipage}{1.0\textwidth}
+        \begin{flushright} \large
+            \emph{Supervised by:}\\
+                C. \textsc{Ferrigno}
+                \hfill
+        \end{flushright}
+    \end{minipage}
+
+
+\newpage
+\setcounter{page}{1}
+    \begin{abstract}
+\noindent bla bla
+    \end{abstract}
+
+
+
+  \end{titlepage}
+
+\newpage
+\setcounter{page}{2}
+\tableofcontents
+
+\newpage
+\section{Background: accretion onto neutron stars and the corresponding X-ray emission}
+
+  \subsection{The sources in our study}
+
+
+
+\newpage
+
+ \section{The NuSTAR mission}
+         \begin{figure}[ht]
+	          \begin{center}
+	            	\includegraphics[width = 12cm]{NuSTAR_artist.jpg}
+		            \caption{An artist view of NuSTAR aircraft \citep[Credits, NASA][]{Harrison2013}.}
+		            \label{fig:fig_NuS}
+            	\end{center}
+          \end{figure}
+
+ NuSTAR is ...
+\newpage
+ \section{Methodology}
+
+        \subsection{Sample data}
+
+\newpage
+
+\section{Results}
+Here the results of our elaboration
+
+\section{Discussion}
+Here a discussion on how our results fit into the literature study and what the bring as new ..
+
+\section{Conclusion}
+
+A summary of what has been done
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newpage
+
+\bibliography{bib.bib}{}
+\bibliographystyle{mnras}
+
+\end{document}
