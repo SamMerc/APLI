@@ -9,16 +9,20 @@ FROM carloferrigno/nustar-pipeline:0.1.0
 # e.g. the following installs apt-utils and vim; each pkg on its own line, all lines
 # except for the last end with backslash '\' to continue the RUN line
 #
-# USER root
+
 # RUN apt-get update && \
 #    apt-get install -y --no-install-recommends \
 #    apt-utils \
 #    vim
-USER ${NB_USER}
 
 # install the python dependencies
 COPY requirements.txt  /tmp/
 RUN pip install -r /tmp/requirements.txt --upgrade 
+
+USER root
+RUN  usermod  --uid 1000 jovyan; usermod -g heasoft jovyan
+USER jovyan
+
 
 # RENKU_VERSION determines the version of the renku CLI
 # that will be used in this image. To find the latest version,

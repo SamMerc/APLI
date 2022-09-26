@@ -18,6 +18,8 @@ git push
 ```
 
 To use a graphical interface see 
+`https://gist.github.com/sorny/969fe55d85c9b0035b0109a31cbcb088`
+(The following has a wrong command)
 `https://www.isdc.unige.ch/integral/download/osa/doc/11.2/osa_inst_guide/node9.html#SECTION00061100000000000000`
 
 ## Use in Renku (need testing)
