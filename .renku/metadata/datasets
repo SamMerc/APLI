@@ -15,7 +15,7 @@
                   "cen-x-3-nustar-prepared-event-files-obsid-30101055002",
                   {
                     "@renku_data_type": "renku.domain_model.dataset.Dataset",
-                    "@renku_oid": "ec892800ec79eb8c80a116058d631c634e97701c0560aa36794ac7c0c8a65350",
+                    "@renku_oid": "4d33446dcae5dc90f70f5129083ae24a3c0c501732e60afb35eb0204bf15584f",
                     "@renku_reference": true
                   }
                 ]
