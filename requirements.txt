@@ -16,3 +16,4 @@ socketIO-client
 pyjs9
 pyLCSIM
 jupyterlab
+stingray
