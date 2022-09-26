@@ -15,3 +15,4 @@ GitPython
 socketIO-client
 pyjs9
 pyLCSIM
+jupyterlab
