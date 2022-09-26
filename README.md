@@ -17,6 +17,8 @@ git commit "MYFILE" -m "MYMESSAGE"
 git push
 ```
 
+To use a graphical interface see 
+`https://www.isdc.unige.ch/integral/download/osa/doc/11.2/osa_inst_guide/node9.html#SECTION00061100000000000000`
 
 ## Use in Renku (need testing)
 Run it with enough storage and 8 Gb memory, better at least 1 CPU
