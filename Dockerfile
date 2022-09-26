@@ -14,7 +14,7 @@ FROM carloferrigno/nustar-pipeline:0.1.0
 #    apt-get install -y --no-install-recommends \
 #    apt-utils \
 #    vim
-# USER ${NB_USER}
+USER ${NB_USER}
 
 # install the python dependencies
 COPY requirements.txt  /tmp/
