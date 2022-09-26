@@ -21,7 +21,7 @@ test: build
 	docker run -e HOME_OVERRRIDE=/tmp-home -v $(PWD):/tmp-home -it $(IMAGE_LATEST) bash -c 'source /usr/local/bin/init.sh; bash $$HOME/self-test.sh'
  
 notebook: 
-	docker run -e ODA_TOKEN=${ODA_TOKEN} -v $(PWD):/home/jovyan -it --entrypoint='' -v ${HOME}/.Xauthority:/home/jovyan/.Xauthority:rw --net=host --user $(DUSER)  $(IMAGE_LATEST) bash -c "source /init.sh;jupyter notebook --ip 0.0.0.0 --no-browser --port=$(JUPYTER_PORT)"
+	docker run -p ${JUPYTER_PORT}:${JUPYTER_PORT} -e DISPLAY=${DISPLAY} -e ODA_TOKEN=${ODA_TOKEN} -v $(PWD):/home/jovyan -it --entrypoint='' -v ${HOME}/.Xauthority:/home/jovyan/.Xauthority:rw --net=host --user $(DUSER)  $(IMAGE_LATEST) bash -c "source /init.sh;jupyter notebook --ip 0.0.0.0 --no-browser --port=$(JUPYTER_PORT)"
 
 run: 
 	docker run -e ODA_TOKEN=${ODA_TOKEN} -e DISPLAY=${DISPLAY} -v /etc/passwd:/etc/passwd -v /tmp/.X11-unix:/tmp/.X11-unix --net=host -v ${HOME}/.Xauthority:/home/jovyan/.Xauthority:rw -v $(PWD):/home/jovyan -it --entrypoint='' --user $(DUSER)  $(IMAGE_LATEST) bash 
