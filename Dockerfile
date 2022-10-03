@@ -16,13 +16,27 @@ FROM carloferrigno/nustar-pipeline:0.1.0
 #    vim
 
 # install the python dependencies
-COPY requirements.txt  /tmp/
-RUN pip install -r /tmp/requirements.txt --upgrade 
-
 USER root
+RUN pip install pipupgrade && \
+    pipupgrade --verbose --latest --yes
+
+COPY requirements.txt  /tmp/
+RUN pip install -r /tmp/requirements.txt
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    apt-utils nodejs python3-novnc tightvncserver libvncserver1 
+
+ADD js9.ipynb /home/jovyan/js9.ipynb
+
+RUN mv /home/heasoft/js* /home/jovyan && \
+    mv /home/heasoft/.jupyter /home/jovyan && \
+    cat /home/jovyan/.jupyter/jupyter_notebook_config.py | sed "s/heasoft/jovyan/g" > /tmp/jupyter_notebook_config.py && \
+    mv /tmp/jupyter_notebook_config.py /home/jovyan/.jupyter/jupyter_notebook_config.py && \
+    chown -R jovyan /home/jovyan
+
 RUN  usermod  --uid 1000 jovyan; usermod -g heasoft jovyan
 USER jovyan
-
 
 # RENKU_VERSION determines the version of the renku CLI
 # that will be used in this image. To find the latest version,
@@ -42,9 +56,14 @@ RUN if [ -n "$RENKU_VERSION" ] ; then \
             if [ -n "$gitversion" ] ; then \
                 pip install --force "git+https://github.com/SwissDataScienceCenter/renku-python.git@$gitversion" ;\
             else \
-                pip install --force renku==${RENKU_VERSION} ;\
+                pip install renku==${RENKU_VERSION} ;\
             fi \
         fi \
     fi
 
-########################################################
+#########################################################
+
+USER root
+RUN pip install mistune --upgrade
+RUN pip uninstall -y jupyter_nbextensions_configurator jupyter_contrib_nbextensions
+USER jovyan
