@@ -1,5 +1,30 @@
 {
   "@renku_data_type": "renku.infrastructure.database.RenkuOOBTree",
-  "@renku_data_value": null,
+  "@renku_data_value": {
+    "@renku_data_type": "builtins.tuple",
+    "@renku_data_value": [
+      {
+        "@renku_data_type": "builtins.tuple",
+        "@renku_data_value": [
+          {
+            "@renku_data_type": "builtins.tuple",
+            "@renku_data_value": [
+              {
+                "@renku_data_type": "builtins.tuple",
+                "@renku_data_value": [
+                  "cen-x-3-nustar-prepared-event-files-obsid-30101055002",
+                  {
+                    "@renku_data_type": "renku.domain_model.dataset.Dataset",
+                    "@renku_oid": "0b9b02c80ded4bd6276086c224ef7eff0ea5df944bfaf5c2de3ea5509f9784ce",
+                    "@renku_reference": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "@renku_oid": "datasets"
 }
