@@ -15,10 +15,15 @@ def get_power_and_freq(time_segments, energy_segments, n):
     '''
     Function to get the power and frequency from the Lomb-Scargle Periodogram
     of the event arrival times array and corresponding energy array.
-    :param time_segments: event arrival times
-    :param energy_segments: energy associated to event arrival times (in PI)
-    :param n: number of segments we consider (useful for the pulse profile matrix)
-    :return:
+    Parameters
+    ----------
+    :param time_segments: array_like, event arrival times
+    :param energy_segments: array_like, energy associated to event arrival times (in PI)
+    :param n: int, number of segments we consider (useful for the pulse profile matrix)
+    Returns
+    ----------
+    :param freq_segments: array, containing frequencies of the Lomb-Scargle Periodogram
+    :param Power_segments: array, containing powers associated to each frequency of the Lomb-Scargle Periodogram
     '''
     
     #Defining the lists that will contain frequency and power values
@@ -35,15 +40,21 @@ def get_power_and_freq(time_segments, energy_segments, n):
 
 def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, power_segments):
     '''
-    Making a function to get the first harmonic frequencies for each segment
-    We will then fit a polynomial to these frequencies to make an accurate epoch_folding function
-    :param order_fit: the order of the poynomial fit we want to do
-    :param limit: the cut-off we apply to remove the red noise from the Periodogram
-    :param ref_time: a reference time used to calculate the elements in bin list (further detailed below)
-    :param time_segments: event arrival times
-    :param freq_segments: frequency values from the Periodogram computed above
-    :param power_segments: power values from the Periodogram computed above
-    :return:
+    Function to get the first harmonic frequencies for each segment.
+    We will then fit a polynomial to these frequencies to make an accurate epoch_folding function.
+    Parameters
+    ----------
+    :param order_fit: int, the order of the poynomial fit we want to do
+    :param limit: float, the cut-off we apply to remove the red noise from the Periodogram
+    :param ref_time: float, a reference time used to calculate the elements in bin list (further detailed below)
+    :param time_segments: array_like, event arrival times
+    :param freq_segments: array_like, frequency values from the Periodogram computed above
+    :param power_segments: array_like, power values from the Periodogram computed above
+    Returns
+    ----------
+    :param reg: list, the coefficients of the polynomial fit to the harmonic frequencies. Can be used to find the 
+    derivative of frequency with respect to segments.
+    :param bins: list, containing the average time per segment since the start of observations.
     '''
     
     #Making the harmonic frequency list and a bin list that we 
@@ -95,14 +106,20 @@ def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, powe
 
 def phase_fold(ref_time, time_array, coeffs):
     '''
-    Epoch folding function to plot the phase folded
-    pulse profiles
-    :param ref_time: a reference time used to calculate the phase
-    :param time_array: event arrival times
-    :param coeffs: the polynomial fitting coefficients gotten from Harmonic_funk
-    :return:
+    Epoch folding function used to plot the phase folded
+    pulse profiles.
+    Parameters
+    ----------
+    :param ref_time: float, a reference time used to calculate the phase
+    :param time_array: array_like, event arrival times
+    :param coeffs: array_like, the polynomial fitting coefficients gotten from Harmonic_funk
+    special case, if coeffs is one value put it in a list! Can't give value by itself.
+    Returns
+    ----------
+    :param phasefold_time: list, the epoch folded event arrival times with respect to the reference time
     '''
-    
+    #We adapt our epoch folding to take into account the frequencies of harmonics, assumed to 
+    #correspond to the "pulse period".
     #We differentiate the case where we do not fit a polynomial and use instead an average value 
     if len(coeffs)==1:
         A = (time_array - ref_time)*coeffs[0]
@@ -118,11 +135,16 @@ def phase_fold(ref_time, time_array, coeffs):
 
 def chisquared(model, expec, uncertainty):
     '''
-    Function to calculate the chi-squared statistic
-    :param model: model data (list/array)
-    :param expec: observational data (list/array)
-    :param uncertainty: uncertainty on the model data (list/array)
-    :return:
+    Function to calculate the chi-squared statistic given data points
+    with their associated uncertainties and theoretical data points.
+    Parameters
+    ----------
+    :param model: array_like, model data 
+    :param expec: array_like, observational data 
+    :param uncertainty: array_like, uncertainties on the observational data 
+    Returns
+    ----------
+    :param Xi: float, the (unreduced) chisquared value
     '''
 
     #Set chi-squared to 0 and progressivelly add on
@@ -135,11 +157,16 @@ def chisquared(model, expec, uncertainty):
 def model_pulse(order, time, counts):
     '''
     Function to model the pulse period
-    with an n-order sinusoidal function
-    :param order:
-    :param time:
-    :param counts:
-    :return:
+    with an n-order sinusoidal function.
+    Parameters
+    ----------
+    :param order: int, order of the sinusoidal function
+    :param time: array_like, epoch-folded lightcurve times used to compute sinusoidal function
+    :param counts: array_like, lightcurve counts we want to model using the n-order sinusoidal function
+    Returns
+    ----------
+    :param A: list, the theoretical counts obtained from the n-order sinusoidal function
+    :param phases: list, all the phases obtained from the Fourier transform our the lightcurve counts
     '''
     
     #Fourier transform the pulse profiles
@@ -163,24 +190,44 @@ def model_pulse(order, time, counts):
     return A, phases
 
 
-
-
 def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, special_case_segments=2, dt=0.01):
     '''
     Function to make and display the pulse profile matrix
-    :param segments: time segments to use
-    :param ref_time: reference time used in the epoch folding function
-    :param reg_coeffs: coefficients used in the epoch folding function obtained from the regression in Harmonic_funk
-    :param special_case: boolean to say whether we are getting a "normal" pulse profile matrix or a special one that
-                         might require some tweaking
-    :param special_case_segments: value pertaining to the number of segments we have in the special case
-    :param dt: value used in the making of a Lightcurve with Stingray
-    :return:
+    Parameters
+    ----------
+    :param segments: int, time segments to use
+    :param ref_time: float, reference time used in the epoch folding function
+    :param reg_coeffs: array_like, coefficients used in the epoch folding function 
+    obtained from the regression in Harmonic_funk
+    :param special_case: boolean, to say whether we are getting a "normal" 
+    pulse profile matrix or a special one that
+    :param special_case_segments: int, value pertaining to the number of segments we have in the special case
+    :param dt: float, value used in the making of a Lightcurve with Stingray
+    Returns
+    ----------
+    :param orders: list, containing the orders of the sinusoidal functions used 
+    to model each segment's pulse profile
+    :param phases: nested lists, containing all the phases for each segment's pulse profile
+    :param folded_counts: nested lists, containing all the lightcurve counts for each segment's pulse profile
+    :param folded_phases: nested lists, containing all the epoch-folded 
+    lightcurve times for each segment's pulse profile
     '''
     
     #Making a function to calculate the order of sinusoidal function to use
     #for the model to overplot on pulse profile of segments. We do this using chisquared
     def find_optimal_order(counts, time):
+        '''
+        Function to calculate the optimal order of sinusoidal function to use
+        for a given pulse profile. The optimal function is found with comparison
+        of chisquared values.
+        Parameters
+        ----------
+        :param counts: array_like, epoch-folded lightcurve times used to compute sinusoidal function
+        :param time: array_like, lightcurve counts we want to model using the n-order sinusoidal function
+        Returns
+        ----------
+        :param n: int, the order of the sinusoidal function to use to model the given pulse profile.
+        '''
         n=0
         failsafe=[]
         std = [np.sqrt(j) for j in counts]
@@ -283,24 +330,21 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
     return orders, phases, folded_counts, folded_phases
 
 
-#
-
-#order: order of the sinusoidal model used i.e. how many harmonics were actually used
-#xdata: data to use for plotting against the phases. By convention we use the average time per segment
-#with respect to the start time
-#phase_list: List containing sub-lists of ALL the phases for each segment
-#will require some manipulation to extract only the useful phases -> Done below
-
-# TODO : Complete
-
 def Plot_phases(order, xdata, phase_list):
     '''
-    We use the previously defined bins list to plot
-    the phases in terms of average time in each segment
-    :param order:
-    :param xdata:
-    :param phase_list:
-    :return:
+    Function to plot the phases for each segment. We differentiate 
+    the different order harmonics by different colors. 
+    Parameters
+    ----------
+    :param order: int, order of the sinusoidal model used corresponding to the number of harmonics used
+    :param xdata: array_like, data used for plotting. By convention we use the average time 
+    per segment with respect to the start of observations. See output of Harmonic_funk.
+    :param phase_list: array_like, list of all the phases for every segment's pulse profile. 
+    See output of pulse_profile_matrix.
+    Returns
+    ----------
+    No returns. Outputs a plot of the phases of harmonics used by each segment,
+    distinguishing the different order of harmonics used.
     '''
     
     #Making lists containing the phases we only care about i.e. the ones used in the sinusoidal model
@@ -329,21 +373,23 @@ def Plot_phases(order, xdata, phase_list):
     return 
 
 
-#Function to segment the event arrival times depending on their energy levels 
-#time_data: event arrival times
-#energy_data: energies of event arrival times
-#nim and nmax: Minimum and maximum energies to consider
-#nbin: number of bins we want to make -> trick : if nbin<0 make the 
-#segmentation logarithmic if nbin>0 make it linear
 def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     '''
-
-    :param time_data:
-    :param energy_data:
-    :param nmin:
-    :param nmax:
-    :param nbin:
-    :return:
+    Function to segment the event arrival times depending on their energy levels, 
+    considering events between a certain range of energies.
+    Parameters
+    ----------
+    :param time_data: array_like, containing event arrival times.
+    :param energy_data: array_like, containing event associated to event arrival times.
+    :param nmin: float, minimum energy to consider.
+    :param nmax: float, maximum energy to consider.
+    :param nbin: int, number of segments we want to make. If nbin<0 we use a logarithmic segmentation.
+    If nbin>0 we use a linear segmentation.
+    Returns
+    :param energy_time_segments: nested lists, containing the times associated to 
+    the energies for nbin segments.
+    :param energy_segments: nested lists, containing the energies for nbin segments in increasing energy order.
+    ----------
     '''
     if nbin < 0:
         size_bin = mt.floor(np.log(nmax-nmin)/nbin)
@@ -383,16 +429,22 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     return energy_time_segments, energy_segments
 
 
-#Get the phase uncertainty for first harmonic for a given pulse profile using 
-#k realizations of said pulse profile.
-#k: number of realizations
-#pulse_profile: bin times and counts per bin
 def bootstrap(pulse_profile, k):
     '''
-
-    :param pulse_profile:
-    :param k:
-    :return:
+    Function to get the uncertainty of the first harmonic's phase for a given pulse profile.
+    This is done by making k realizations of the given pulse profile using a Poisson distribution
+    to describe the number of counts.
+    Parameters
+    ----------
+    :param pulse_profile: tuple, containing the epoch-folded lightcurve times and lightcurve counts for
+    a given pulse profile.
+    :param k: int, the number of realizations of the pulse profile to make
+    Returns
+    ----------
+    :param fake_profiles: nested lists, the simulated k realizations of the given pulse profile. 
+    Can be used for plotting to make sure output of function is plausible.
+    :param std: float, standard deviation on the phase of first harmonic for a given pulse profile.
+    :param true_phase: float, the phase of first harmonic for the given pulse profile we consider.
     '''
     #Getting the time and counts data
     time, counts = pulse_profile
