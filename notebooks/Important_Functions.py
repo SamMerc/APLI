@@ -190,12 +190,12 @@ def model_pulse(order, time, counts):
     return A, phases
 
 
-def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, special_case_segments=2, dt=0.01):
+def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, special_case_segments=2, dt=0.01, confi_level=0.1):
     '''
     Function to make and display the pulse profile matrix
     Parameters
     ----------
-    :param segments: int, time segments to use
+    :param segments: array_like, even arrival time segments used to make the lightcurve
     :param ref_time: float, reference time used in the epoch folding function
     :param reg_coeffs: array_like, coefficients used in the epoch folding function 
     obtained from the regression in Harmonic_funk
@@ -215,7 +215,8 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
     
     #Making a function to calculate the order of sinusoidal function to use
     #for the model to overplot on pulse profile of segments. We do this using chisquared
-    def find_optimal_order(counts, time):
+    #TO DO update documentation
+    def find_optimal_order(counts, time, conf_level = 0.1):
         '''
         Function to calculate the optimal order of sinusoidal function to use
         for a given pulse profile. The optimal function is found with comparison
@@ -225,11 +226,12 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
         :param counts: array_like, epoch-folded lightcurve times used to compute sinusoidal function
         :param time: array_like, lightcurve counts we want to model using the n-order sinusoidal function
         Returns
+        :param conf_level: float, confidence level used for the survival function test.
         ----------
         :param n: int, the order of the sinusoidal function to use to model the given pulse profile.
         '''
         n=0
-        failsafe=[]
+        SFs=[]
         std = [np.sqrt(j) for j in counts]
         #Go through possible values of order and compute the chisquared for each of them
         #Stop once the chisquared has reached <0.001.
@@ -238,15 +240,17 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
             #We use the chisquared calculator defined above
             #We take into account the degrees of freedom when calculating the
             #survival function with chi2.sf -> chi2.sf gives us our goodness of fit value
-            free_deg = 1 + 2*i
+            free_deg = len(counts)-(1 + 2*i)
             chisq=chisquared(model, counts, std)
             #devising a failsafe in case we get n=0 (need to re-work this)
-            failsafe.append(chi2.sf(chisq, free_deg))
-            if chi2.sf(chisq, free_deg) > .1:
-                n=i
+            SFs.append(chi2.sf(chisq, free_deg))
+            n=i
+            if chi2.sf(chisq, free_deg) > conf_level:
                 break
-        if n==0:
-            n=failsafe[2]
+        if n==int(len(counts)/2)-1:
+            n = np.argmax(SFs)
+            print('Warning: Did not find an order that satisfies the confidence level, '
+                  'failsafe system implements:', n, 'with SF=', SFs[n])
         return n
     
     #Create array that will contain the phase value of 
@@ -255,13 +259,20 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
 
     #Create figure variables in the case where we make the normal pulse profile matrix
     if not special_case:
-        f, ((ax1, ax2, ax3, ax4, ax5), 
-    (ax6, ax7, ax8, ax9, ax10), 
-    (ax11, ax12, ax13, ax14, ax15), 
-    (ax16, ax17, ax18, ax19, ax20)) = plt.subplots(4, 5, sharex=True, figsize=(10, 10), sharey=True)
-        axs = [ax1,ax2,ax3,ax4,ax5,ax6,ax7,ax8,ax9,ax10,
-       ax11,ax12,ax13,ax14,ax15,ax16,ax17,ax18,ax19,ax20] 
-    
+        if len(segments) <= 4:
+            fig, axs = plt.subplots(1, 4, figsize=(10,10))
+        else:
+            fig, axs = plt.subplots(mt.ceil(len(segments)/4), 4, sharex=True, figsize=(10, 10))
+        fig.subplots_adjust(hspace=.05, wspace=.1)
+        axs = axs.ravel()
+    else:
+        if special_case_segments <= 4:
+            fig, axs = plt.subplots(1, 4, figsize=(10,10))
+        else:
+            fig, axs = plt.subplots(mt.ceil(special_case_segments/4), 4, sharex=True, figsize=(10, 10))
+        fig.subplots_adjust(hspace=.05, wspace=.1)
+        axs = axs.ravel()
+        
     #Making a list that will contain the orders of sinusoidal model used for each segment 
     orders=[]
     
@@ -273,7 +284,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
     #and overplotting a first-order sinusoidal model
     #using the phase of first harmonics of each segment.
     if not special_case:
-        for i in range(20):
+        for i in range(len(segments)):
         
         #Computing the phase folded time
             test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
@@ -284,7 +295,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
             folded_phases.append(test_lc.time)
             
     #Finding order of model to use
-            order=find_optimal_order(test_lc.counts, test_lc.time)
+            order=find_optimal_order(test_lc.counts, test_lc.time, confi_level)
             orders.append(order)
             print(order)
             
@@ -296,10 +307,10 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
 
     #Plot the pulse profile and the cosine obtained from phase of first "order" harmonic frequencies
             axs[i].plot(test_lc.time, test_lc.counts, '.')
-            axs[i].plot(test_lc.time, model, '.')
-        axs[2].set_title('Pulse Profile Matrix')
-        axs[5].set_ylabel('Photon count')
-        axs[17].set_xlabel('Phase')
+            axs[i].plot(test_lc.time, model)
+            if i%4 != 0:
+                axs[i].set_yticklabels([])
+            fig.suptitle('Pulse Profile Matrix')
     else:
         for i in range(special_case_segments):
         
@@ -312,7 +323,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
             folded_phases.append(test_lc.time)
     #Finding order of model to use
     
-            order=find_optimal_order(test_lc.counts, test_lc.time)
+            order=find_optimal_order(test_lc.counts, test_lc.time, confi_level)
             orders.append(order)
             print(order)
     #Create n-order sinusoidal model using the phase of first harmonics
@@ -322,9 +333,11 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
             phases.append(model_phase)
 
     #Plot the pulse profile and the cosine obtained from phase of first harmonic frequency
-            plt.plot(test_lc.time, test_lc.counts, '.')
-            plt.plot(test_lc.time, model, '.')
-            plt.show()
+            axs[i].plot(test_lc.time, test_lc.counts, '.')
+            axs[i].plot(test_lc.time, model)
+            if i%4 != 0:
+                axs[i].set_yticklabels([])
+            fig.suptitle('Energy Pulse Profile Matrix')
     #Returning the order of sinusoidal model used, all the phases for each segment, 
     #the folded counts and times for bootstrapping
     return orders, phases, folded_counts, folded_phases
@@ -391,24 +404,24 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     :param energy_segments: nested lists, containing the energies for nbin segments in increasing energy order.
     ----------
     '''
-    if nbin < 0:
-        size_bin = mt.floor(np.log(nmax-nmin)/nbin)
+    #Differentiating the cases depending on sign of nbin.
+    #For both cases we create a list of boundaries we will use to create the energy
+    #segments.
+    if nbin<0:
+        bins = 10**(np.linspace(np.log10(nmin), np.log10(nmax), np.abs(nbin)+1))
     else:
-        size_bin = mt.floor((nmax-nmin)/nbin)
-    
-    #Defining lists we want to populate with the event arrival times 
-    #and energy segments
+        bins = np.linspace(nmin, nmax, nbin+1)
+
+    #Initiating time and energy segments' lists to populate them in the next step.
     energy_time_segments = []
     energy_time_segment = []
     energy_segments = []
     energy_segment = []
-    
-    #Distinguishing the cases and populating
     if nbin<0:
-        for i in range(nbin):
+        for i in range(np.abs(nbin)):
             for j in range(len(energy_data)):
-                if np.exp(size_bin)*i*40 < Time_phase_file[1].data['PI'][j] < np.exp(size_bin)*(i+1)*40:
-                    energy_segment.append(Time_phase_file[1].data['PI'][j]*40)
+                if bins[i] < Time_phase_data['PI'][j] < bins[i+1]:
+                    energy_segment.append(Time_phase_data['PI'][j]*4e-2)
                     energy_time_segment.append(correct_orbit_time[j])
             energy_segments.append(energy_segment)
             energy_time_segments.append(energy_time_segment)
@@ -417,50 +430,34 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     else: 
         for i in range(nbin):
             for j in range(len(energy_data)):
-                if size_bin*i < Time_phase_file[1].data['PI'][j] < size_bin*(i+1):
-                    energy_segment.append(Time_phase_file[1].data['PI'][j]*40)
+                if bins[i] < Time_phase_data['PI'][j] < bins[i+1]:
+                    energy_segment.append(Time_phase_data['PI'][j]*4e-2)
                     energy_time_segment.append(correct_orbit_time[j])
             energy_segments.append(energy_segment)
             energy_time_segments.append(energy_time_segment)
             energy_time_segment=[]
             energy_segment=[]
-            
-    #Returning the event arrival times in terms of their energy
     return energy_time_segments, energy_segments
 
-
-def bootstrap(pulse_profile, k):
+def bootstrap_generate(counts, k):
     '''
-    Function to get the uncertainty of the first harmonic's phase for a given pulse profile.
-    This is done by making k realizations of the given pulse profile using a Poisson distribution
+    Function to make k realizations of a given pulse profile using a Poisson distribution
     to describe the number of counts.
     Parameters
     ----------
-    :param pulse_profile: tuple, containing the epoch-folded lightcurve times and lightcurve counts for
-    a given pulse profile.
+    :param counts: array_like containing the lightcurve counts for a given pulse profile.
     :param k: int, the number of realizations of the pulse profile to make
     Returns
     ----------
     :param fake_profiles: nested lists, the simulated k realizations of the given pulse profile. 
     Can be used for plotting to make sure output of function is plausible.
-    :param std: float, standard deviation on the phase of first harmonic for a given pulse profile.
-    :param true_phase: float, the phase of first harmonic for the given pulse profile we consider.
     '''
-    #Getting the time and counts data
-    time, counts = pulse_profile
-    
     #Setting up lists for the fake pulse profile values
-    #and matrix multiplication step as well as the k realizations 
-    #of the first harmonic phase
+    #and matrix multiplication step
     fake_profiles = []
     fake_profile = []
     row=[]
-    phases_k=[]
-        
-    #Getting the actual phase of first harmonic for the pulse profile we are considering
-    #to make sure our results are sensible 
-    true_phase = np.arctan2(np.fft.rfft(counts).imag, np.fft.rfft(counts).real)[1]
-        
+    
     #Making k realizations of our pulse profile using a Poisson distibution centered
     #on the number of photon counts of each point in the pulse profile.
     for i in range(len(counts)):
@@ -474,19 +471,65 @@ def bootstrap(pulse_profile, k):
             row.append(fake_profile[i][j])
         fake_profiles.append(row)
         row=[]
-    
-    #Calculating the phase of first harmonic for the k realizations 
-    #and populating the phases_k list. 
-    for l in range(len(fake_profiles)):
-        fft = np.fft.rfft(fake_profiles[l])
-        phase_l = np.arctan2(fft.imag, fft.real)
-        phases_k.append(phase_l[1])
-        
-    #Getting the standard deviation of our phase measurement using the 
-    #bootstrapping method)
-    std = (1/k)*np.sum((np.array(phases_k)-np.mean(phases_k))**2)
-    
-     
-    return fake_profiles, std, true_phase
+    return fake_profiles
 
 
+def bootstrap_total(counts, k, func, *args):
+    '''
+    Function to calculate the standard deivation of a specific quantity obtained from
+    the function func.
+    Parameters
+    ----------
+    :param counts: array_like containing the lightcurve counts for a given pulse profile
+    :param k: int, the number of realizations of the pulse profile to make
+    :param func: function, to calculate a certain quantity/statistic of the pulse profile
+    :param *args: any additional arguments required for func
+    Returns
+    ----------
+    :param std: float, standard deviation on the quantity/statistic for the given given pulse profile.
+    '''
+    #Get the k realizations of the pulse profile from the bootstrap_generate function
+    profiles = bootstrap_generate(counts, k)
+    #Prepare an array that will contain the quantity we want for every realization
+    values = []
+    #Populate the values list with the quantity using the input func function and its arguments
+    for i in range(len(profiles)):
+        values.append(func(profiles[i], *args))
+    #Calculating the standard deviation of the quantity of interest using the k realizations of it
+    std = (1/k)*np.sum((np.array(values)-np.mean(values))**2)
+    return std
+
+def get_first_harmonic_phase(counts):
+    '''
+    Function to calculate the phase of the first harmonic frequency for a given pulse profile.
+    Parameters
+    ----------
+    :param counts: array_like, containing the lightcurve counts for a given pulse profile
+    Returns
+    ----------
+    :param phase_l: float, phase of the first harmonic frequency for the given pulse profile.
+    '''
+    #Calculating the phases for the lightcurve counts using the Fourier transform
+    #and taking the first element of the list of phases (technically the second element
+    #because the very first phase is always 0).
+    fft = np.fft.rfft(counts)
+    phase_l = np.arctan2(fft.imag, fft.real)[1]
+    return phase_l
+
+def RMS_calculator(counts):
+    '''
+    Function to calculate the Root-Mean Squared (RMS) for a given pulse profile.
+    Parameters
+    ----------
+    :param counts: array_like, containing the lightcurve counts for a given pulse profile
+    Returns
+    ----------
+    :param RMS: float, RMS for the given pulse profile.
+    '''
+    #We calculate the amplitudes associated to each harmonics' phase using a 
+    #Fourier transform of the pulse profile. We then perform a RMS method on these
+    #amplitudes and output the result.
+    counts_fft = np.fft.rfft(counts)
+    amps = np.sqrt(counts_fft.imag**2 + counts_fft.real**2)
+    RMS = np.sqrt(np.sum(amps**2))/len(amps)
+    return RMS
