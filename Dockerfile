@@ -27,7 +27,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     apt-utils nodejs python3-novnc tightvncserver libvncserver1 
 
-ADD js9.ipynb /home/jovyan/js9.ipynb
+#ADD js9.ipynb /home/jovyan/js9.ipynb
 
 RUN mv /home/heasoft/js* /home/jovyan && \
     mv /home/heasoft/.jupyter /home/jovyan && \
