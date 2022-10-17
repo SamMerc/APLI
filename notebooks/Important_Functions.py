@@ -9,6 +9,119 @@ import scipy.stats as st
 from stingray import Lightcurve
 import statistics
 from scipy.stats import chi2
+from stingray.pulse import epoch_folding_search
+from stingray.pulse import get_orbital_correction_from_ephemeris_file
+
+
+def get_GTIs(data_file):
+    '''
+    Function to get the Good Time Intervals (GTIs).
+    Parameters
+    ----------
+    :param data_file: file name, containing the source's GTI data file
+    Returns
+    ----------
+    :param new_gtis: tuples list, containing tuples of start and stop time of the GTIs
+    '''
+    #Retrieving the GTIs
+    GTI_phase_file = data_file
+    #Re-formatting the GTIs so that we can use them in the Stingray package
+    new_gtis=[]
+    for i in GTI_phase_file.data:
+        new_gtis.append((i['START'], i['STOP']))
+    return new_gtis
+
+
+def get_orbital_correction(data_file, param_file_name):
+    '''
+    Function to get the event arrival times with orbital correction.
+    Parameters
+    ----------
+    :param data_file: file name, containing the source's event arrival times and 
+    other useful data (base time)
+    :param param_file_name: string, containing the name for the parameter file used
+    for the orbital correction
+    Returns
+    ----------
+    :param correct_orbit_time: array, containing event arrival times with orbital correction
+    '''
+    #Reference time in MJD
+    base_time = data_file.header['MJDREFI']+data_file.header['MJDREFF']
+    
+    #Converting start time of observations in seconds
+    start_time = data_file.header['TSTART']/(24*3600)
+    
+    #Converting end time of observations in seconds
+    end_time = data_file.header['TSTOP']/(24*3600)
+    
+    #Getting the correct_time function from the parameters defined above 
+    #and the orbit_t2.txt file containing the orbital parameters of the source
+    correct_time = get_orbital_correction_from_ephemeris_file(base_time+start_time, base_time+end_time, parfile=param_file_name)[0]
+    
+    #Applying the correct_time function to our event arrival times
+    correct_orbit_time = correct_time(data_file.data['TIME'], base_time)
+    
+    return correct_orbit_time
+
+def get_pulse_freq(f_min, f_max, N, correct_time_array, GTI, seg_size):
+    '''
+    Function to get the pulse frequency using the event arrival times with orbital correction.
+    Parameters
+    ----------
+    :param f_min: float, the low end of range of frequencies we want to test.
+    :param f_max: float, the high end of range of frequencies we want to test.
+    :param N: int, the number of frequencies to test between f_min and f_max.
+    :param correct_time_array: array, containing the source's event arrival times 
+    with orbital correction.
+    :param GTI: array, containing the GTI obtained from get_GTIs function.
+    :param seg_size: int, length of segments to to be averaged in periodogram.
+    Returns
+    ----------
+    :param correct_L: tuple list, containing a list of frequencies and a list of corresponding power.
+    :param best_freq: float, frequency corresponding the the maximum power. 
+    '''
+    
+    #Defining frequencies to try - required for epoch_folding_search
+    #Can either take a large range but then the resolution is low
+    #Or small range with high resolution -> could maybe do this iteratively
+    trial_freqs = np.linspace(f_min, f_max, N)
+    
+    #Getting the power as a function of frequency from 1. the event arrival times and 
+    #2. the event arrival times with orbital correction to show the difference
+    correct_L = epoch_folding_search(correct_time_array, trial_freqs, 
+                                     segment_size=seg_size, gti=GTI)
+    
+    best_freq = correct_L[0][np.argmax(correct_L[1])]
+    
+    return correct_L, best_freq
+
+
+def segment_time(PI_data, correct_time, N):
+    '''
+    Function to make N segments from the event arrival times and PI energies.
+    Parameters
+    ----------
+    :param PI_data: array, containing the energy (PI) data for each event arrival time.
+    :param correct_time: array, containing the event arrival times with orbital correction.
+    :param N: int, the number of segments to make.
+    Returns
+    ----------
+    :param Time_segments: nested lists, containing N segments of event arrival times.
+    :param PI_segments: nested lists, containing N segments of energy corresponding to the event arrival time. 
+    '''
+    #We get the size of bins to use
+    seg_size = int(len(correct_time)/N)
+    
+    #Making lists that will contain the N segments of time and PI data.
+    #We extract the PI data to get the periodogram for each segment.
+    Time_segments = []
+    PI_segments = []
+
+    #Populating the time and PI segment lists
+    for i in range(N):
+        Time_segments.append(correct_time[seg_size*i:seg_size*(i+1)])
+        PI_segments.append(PI_data[seg_size*i:seg_size*(i+1)])
+    return Time_segments, PI_segments
 
 
 def get_power_and_freq(time_segments, energy_segments, n):
@@ -38,7 +151,7 @@ def get_power_and_freq(time_segments, energy_segments, n):
     return freq_segments, Power_segments
 
 
-def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, power_segments):
+def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, power_segments, guess_frequency):
     '''
     Function to get the first harmonic frequencies for each segment.
     We will then fit a polynomial to these frequencies to make an accurate epoch_folding function.
@@ -66,11 +179,12 @@ def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, powe
     bins = []
     
     #Populating the Harmonic and bins lists 
-    for i in range(20):
+    for i in range(len(time_segments)):
         bins.append(float(np.mean(time_segments[i]-ref_time)))
     
     #Cutting off frequencies (and power associated) 
     #that are due to red noise (low frequencies)
+    #Obtained by plotting the periodogram and checking when the red noise decreases -> change it?
         temp_1 = freq_segments[i] > limit
     
     #Getting the cut-off frequencies and powers
@@ -95,7 +209,8 @@ def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, powe
         new_Harmonics.append(predict(i))
     
     #Plot modelled harmonics on top of the observed ones.
-    plt.plot(bins, new_Harmonics, '.', label='Expected Harmonic freq. (Lin.Reg.)')
+    plt.plot(bins, new_Harmonics, label='Expected Harmonic freq. (Lin.Reg.)')
+    plt.axhline(y=guess_frequency, color='green')
     plt.xlabel('Segment number')
     plt.ylabel('Main Hamornic Frequency (Hz)')
     plt.legend()
@@ -190,7 +305,7 @@ def model_pulse(order, time, counts):
     return A, phases
 
 
-def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, special_case_segments=2, dt=0.01, confi_level=0.1):
+def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case, special_case_segments, dt=0.01, confi_level=0.1):
     '''
     Function to make and display the pulse profile matrix
     Parameters
@@ -288,7 +403,6 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
         
         #Computing the phase folded time
             test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
-
     #Making the lightcurve using the phase folded time
             test_lc = Lightcurve.make_lightcurve(test_phase_fold, dt)
             folded_counts.append(test_lc.counts)
@@ -312,11 +426,11 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case=False, spe
                 axs[i].set_yticklabels([])
             fig.suptitle('Pulse Profile Matrix')
     else:
+        print(special_case_segments)
         for i in range(special_case_segments):
         
         #Computing the phase folded time
             test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
-
     #Making the lightcurve using the phase folded time
             test_lc = Lightcurve.make_lightcurve(test_phase_fold, dt)
             folded_counts.append(test_lc.counts)
@@ -392,7 +506,7 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     considering events between a certain range of energies.
     Parameters
     ----------
-    :param time_data: array_like, containing event arrival times.
+    :param time_data: array_like, containing event arrival times (with orbital correction).
     :param energy_data: array_like, containing event associated to event arrival times.
     :param nmin: float, minimum energy to consider.
     :param nmax: float, maximum energy to consider.
@@ -420,9 +534,9 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     if nbin<0:
         for i in range(np.abs(nbin)):
             for j in range(len(energy_data)):
-                if bins[i] < Time_phase_data['PI'][j] < bins[i+1]:
-                    energy_segment.append(Time_phase_data['PI'][j]*4e-2)
-                    energy_time_segment.append(correct_orbit_time[j])
+                if bins[i] < energy_data[j] < bins[i+1]:
+                    energy_segment.append(energy_data[j]*4e-2)
+                    energy_time_segment.append(time_data[j])
             energy_segments.append(energy_segment)
             energy_time_segments.append(energy_time_segment)
             energy_time_segment=[]
@@ -430,9 +544,9 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     else: 
         for i in range(nbin):
             for j in range(len(energy_data)):
-                if bins[i] < Time_phase_data['PI'][j] < bins[i+1]:
-                    energy_segment.append(Time_phase_data['PI'][j]*4e-2)
-                    energy_time_segment.append(correct_orbit_time[j])
+                if bins[i] < energy_data[j] < bins[i+1]:
+                    energy_segment.append(energy_data[j]*4e-2)
+                    energy_time_segment.append(time_data[j])
             energy_segments.append(energy_segment)
             energy_time_segments.append(energy_time_segment)
             energy_time_segment=[]
@@ -496,7 +610,8 @@ def bootstrap_total(counts, k, func, *args):
     for i in range(len(profiles)):
         values.append(func(profiles[i], *args))
     #Calculating the standard deviation of the quantity of interest using the k realizations of it
-    std = (1/k)*np.sum((np.array(values)-np.mean(values))**2)
+
+    std = np.sqrt((1/k)*np.sum((np.array(values)-np.mean(values))**2))
     return std
 
 def get_first_harmonic_phase(counts):
@@ -516,7 +631,7 @@ def get_first_harmonic_phase(counts):
     phase_l = np.arctan2(fft.imag, fft.real)[1]
     return phase_l
 
-def RMS_calculator(counts):
+def RMS_calculator(counts, k):
     '''
     Function to calculate the Root-Mean Squared (RMS) for a given pulse profile.
     Parameters
@@ -531,5 +646,6 @@ def RMS_calculator(counts):
     #amplitudes and output the result.
     counts_fft = np.fft.rfft(counts)
     amps = np.sqrt(counts_fft.imag**2 + counts_fft.real**2)
-    RMS = np.sqrt(np.sum(amps**2))/len(amps)
+    RMS = np.sqrt(np.sum(amps[1:k]**2))/amps[0]
+
     return RMS
