@@ -609,9 +609,12 @@ def bootstrap_total(counts, k, func, *args):
     #Populate the values list with the quantity using the input func function and its arguments
     for i in range(len(profiles)):
         values.append(func(profiles[i], *args))
+    
     #Calculating the standard deviation of the quantity of interest using the k realizations of it
-
     std = np.sqrt((1/k)*np.sum((np.array(values)-np.mean(values))**2))
+    
+    #Compared to the plot in your Elaboration.ipynb, the RMS errors bars in my RMSvsEnergy plot 
+    # at the end of Day3.ipynb are smaller.
     return std
 
 def get_first_harmonic_phase(counts):
@@ -645,7 +648,15 @@ def RMS_calculator(counts, k):
     #Fourier transform of the pulse profile. We then perform a RMS method on these
     #amplitudes and output the result.
     counts_fft = np.fft.rfft(counts)
+    
+    #Hi Carlo, the error I was getting with the RMS was because I was using these equations: 
+    #amps = np.sqrt(counts_fft.imag**2 + counts_fft.real**2)[1:k]
+    #RMS = np.sqrt(np.sum(amps**2))/amps[0]
+    
+    #Instead of these equations 
     amps = np.sqrt(counts_fft.imag**2 + counts_fft.real**2)
     RMS = np.sqrt(np.sum(amps[1:k]**2))/amps[0]
-
+    
+    #As you can see this is simply an indexing error but I am still a little confused as to
+    #why it is happening.
     return RMS
