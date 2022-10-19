@@ -576,7 +576,8 @@ def bootstrap_generate(counts, k):
     #on the number of photon counts of each point in the pulse profile.
     for i in range(len(counts)):
         fake_profile.append(st.poisson.rvs(mu=counts[i], size=k))
-        
+    
+    #CF : here maybe you could just transpose the matrix
     #Re-making the k realizations so that instead of having an n x k matrix 
     #We have a k x n matrix -> will make it easier to plot the k realizations of the 
     #pulse profile.
@@ -611,7 +612,7 @@ def bootstrap_total(counts, k, func, *args):
         values.append(func(profiles[i], *args))
     
     #Calculating the standard deviation of the quantity of interest using the k realizations of it
-    std = np.sqrt((1/k)*np.sum((np.array(values)-np.mean(values))**2))
+    std = np.sqrt(np.sum((np.array(values)-np.mean(values))**2)/(k-1.0))
     
     #Compared to the plot in your Elaboration.ipynb, the RMS errors bars in my RMSvsEnergy plot 
     # at the end of Day3.ipynb are smaller.
@@ -659,4 +660,6 @@ def RMS_calculator(counts, k):
     
     #As you can see this is simply an indexing error but I am still a little confused as to
     #why it is happening.
+    
+    #CF you were summing all harmonics, before, not just the first "k"
     return RMS
