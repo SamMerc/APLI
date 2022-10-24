@@ -305,7 +305,7 @@ def model_pulse(order, time, counts):
     return A, phases
 
 
-def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case, special_case_segments, dt=0.01, confi_level=0.1):
+def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, confi_level=0.1):
     '''
     Function to make and display the pulse profile matrix
     Parameters
@@ -314,10 +314,10 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case, special_c
     :param ref_time: float, reference time used in the epoch folding function
     :param reg_coeffs: array_like, coefficients used in the epoch folding function 
     obtained from the regression in Harmonic_funk
-    :param special_case: boolean, to say whether we are getting a "normal" 
-    pulse profile matrix or a special one that
-    :param special_case_segments: int, value pertaining to the number of segments we have in the special case
+    :param title_str: string, to be used as the main title for the figure
     :param dt: float, value used in the making of a Lightcurve with Stingray
+    :param confi_level: float, value used in find_optimal function as the cutoff for the
+    survival function.
     Returns
     ----------
     :param orders: list, containing the orders of the sinusoidal functions used 
@@ -331,6 +331,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case, special_c
     #Making a function to calculate the order of sinusoidal function to use
     #for the model to overplot on pulse profile of segments. We do this using chisquared
     #TO DO update documentation
+
     def find_optimal_order(counts, time, conf_level = 0.1):
         '''
         Function to calculate the optimal order of sinusoidal function to use
@@ -373,21 +374,13 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case, special_c
     phases = []
 
     #Create figure variables in the case where we make the normal pulse profile matrix
-    if not special_case:
-        if len(segments) <= 4:
-            fig, axs = plt.subplots(1, 4, figsize=(10,10))
-        else:
-            fig, axs = plt.subplots(mt.ceil(len(segments)/4), 4, sharex=True, figsize=(10, 10))
-        fig.subplots_adjust(hspace=.05, wspace=.1)
-        axs = axs.ravel()
+    if len(segments) <= 4:
+        fig, axs = plt.subplots(1, 4, figsize=(10,10))
     else:
-        if special_case_segments <= 4:
-            fig, axs = plt.subplots(1, 4, figsize=(10,10))
-        else:
-            fig, axs = plt.subplots(mt.ceil(special_case_segments/4), 4, sharex=True, figsize=(10, 10))
-        fig.subplots_adjust(hspace=.05, wspace=.1)
-        axs = axs.ravel()
-        
+        fig, axs = plt.subplots(mt.ceil(len(segments)/4), 4, sharex=True, figsize=(10, 10))
+    fig.subplots_adjust(hspace=.05, wspace=.1)
+    axs = axs.ravel()
+            
     #Making a list that will contain the orders of sinusoidal model used for each segment 
     orders=[]
     
@@ -398,62 +391,34 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, special_case, special_c
     #Making the pulse profile for each segment 
     #and overplotting a first-order sinusoidal model
     #using the phase of first harmonics of each segment.
-    if not special_case:
-        for i in range(len(segments)):
-        
+    for i in range(len(segments)):
         #Computing the phase folded time
-            test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
+        test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
     #Making the lightcurve using the phase folded time
-            test_lc = Lightcurve.make_lightcurve(test_phase_fold, dt)
-            folded_counts.append(test_lc.counts)
-            folded_phases.append(test_lc.time)
+        test_lc = Lightcurve.make_lightcurve(test_phase_fold, dt)
+        folded_counts.append(test_lc.counts)
+        folded_phases.append(test_lc.time)
             
     #Finding order of model to use
-            order=find_optimal_order(test_lc.counts, test_lc.time, confi_level)
-            orders.append(order)
-            print(order)
+        order=find_optimal_order(test_lc.counts, test_lc.time, confi_level)
+        orders.append(order)
+        print(order)
             
     #Create n-order sinusoidal model using the phase of first harmonics
-            model, model_phase = model_pulse(order, test_lc.time, test_lc.counts)
+        model, model_phase = model_pulse(order, test_lc.time, test_lc.counts)
 
     #Make a list containing the phases for future use 
-            phases.append(model_phase)
+        phases.append(model_phase)
 
     #Plot the pulse profile and the cosine obtained from phase of first "order" harmonic frequencies
-            axs[i].plot(test_lc.time, test_lc.counts, '.')
-            axs[i].plot(test_lc.time, model)
-            if i%4 != 0:
-                axs[i].set_yticklabels([])
-            fig.suptitle('Pulse Profile Matrix')
-    else:
-        print(special_case_segments)
-        for i in range(special_case_segments):
-        
-        #Computing the phase folded time
-            test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
-    #Making the lightcurve using the phase folded time
-            test_lc = Lightcurve.make_lightcurve(test_phase_fold, dt)
-            folded_counts.append(test_lc.counts)
-            folded_phases.append(test_lc.time)
-    #Finding order of model to use
+        axs[i].plot(test_lc.time, test_lc.counts, '.')
+        axs[i].plot(test_lc.time, model)
+        if i%4 != 0:
+            axs[i].set_yticklabels([])
+        fig.suptitle(title_str)
     
-            order=find_optimal_order(test_lc.counts, test_lc.time, confi_level)
-            orders.append(order)
-            print(order)
-    #Create n-order sinusoidal model using the phase of first harmonics
-            model, model_phase = model_pulse(order, test_lc.time, test_lc.counts)
-
-    #Make a list containing the phases for future use 
-            phases.append(model_phase)
-
-    #Plot the pulse profile and the cosine obtained from phase of first harmonic frequency
-            axs[i].plot(test_lc.time, test_lc.counts, '.')
-            axs[i].plot(test_lc.time, model)
-            if i%4 != 0:
-                axs[i].set_yticklabels([])
-            fig.suptitle('Energy Pulse Profile Matrix')
     #Returning the order of sinusoidal model used, all the phases for each segment, 
-    #the folded counts and times for bootstrapping
+    #the folded counts and times for bootstrapping'''
     return orders, phases, folded_counts, folded_phases
 
 
@@ -641,6 +606,8 @@ def RMS_calculator(counts, k):
     Parameters
     ----------
     :param counts: array_like, containing the lightcurve counts for a given pulse profile
+    :param k: int, number of amplitudes/phases used for the sinusoidal model of the pulse
+    profile we consider. Corresponds to the order of the model.
     Returns
     ----------
     :param RMS: float, RMS for the given pulse profile.
