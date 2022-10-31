@@ -36,8 +36,12 @@ RUN mv /home/heasoft/js* /home/jovyan && \
     chown -R jovyan /home/jovyan
 
 RUN  usermod  --uid 1000 jovyan; usermod -g heasoft jovyan
+USER heasoft
+RUN cd /home/heasoft;git clone https://gitlab.astro.unige.ch/ferrigno/xspec_lmod.git;cd xspec_lmod;initpackage bwmod model.dat `pwd`;hmake;cd /home/jovyan
+USER root
+ADD .xspec/Xspec.init /home/jovyan/.xspec/Xspec.init
+RUN chown -R jovyan /home/jovyan/.xspec
 USER jovyan
-
 # RENKU_VERSION determines the version of the renku CLI
 # that will be used in this image. To find the latest version,
 # visit https://pypi.org/project/renku/#history.
