@@ -305,7 +305,7 @@ def model_pulse(order, time, counts):
     return A, phases
 
 
-def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, confi_level=0.1):
+def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0.01, confi_level=0.1):
     '''
     Function to make and display the pulse profile matrix
     Parameters
@@ -318,6 +318,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, con
     :param dt: float, value used in the making of a Lightcurve with Stingray
     :param confi_level: float, value used in find_optimal function as the cutoff for the
     survival function.
+    :param cutoff: int, the number of segments we want to use.
     Returns
     ----------
     orders: list, containing the orders of the sinusoidal functions used
@@ -360,24 +361,31 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, con
             chisq=chisquared(model, counts, std)
             #devising a failsafe in case we get n=0 (need to re-work this)
             SFs.append(chi2.sf(chisq, free_deg))
+            #print('for degree ', i, ' we have SF ', chi2.sf(chisq, free_deg))
             n=i
             if chi2.sf(chisq, free_deg) > conf_level:
                 break
-        if n==int(len(counts)/2)-1:
-            n = np.argmax(SFs)
+        #print(np.diff(SFs))
+        if n==int(len(counts)/2)-1 or n>10:
+            for i in range(len(np.diff(SFs))):
+                if np.diff(SFs)[i]<0:
+                    n=i
+                    break
             print('Warning: Did not find an order that satisfies the confidence level, '
                   'failsafe system implements:', n, 'with SF=', SFs[n])
+        if n==1:
+            n=2        
         return n
     
     #Create array that will contain the phase value of 
     #1st harmonic for each segment 
     phases = []
-
+    
     #Create figure variables in the case where we make the normal pulse profile matrix
-    if len(segments) <= 4:
+    if cutoff <= 4:
         fig, axs = plt.subplots(1, 4, figsize=(10,10))
     else:
-        fig, axs = plt.subplots(mt.ceil(len(segments)/4), 4, sharex=True, figsize=(10, 10))
+        fig, axs = plt.subplots(mt.ceil(cutoff/4), 4, sharex=True, figsize=(15, 15))
     fig.subplots_adjust(hspace=.05, wspace=.1)
     axs = axs.ravel()
             
@@ -391,7 +399,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, con
     #Making the pulse profile for each segment 
     #and overplotting a first-order sinusoidal model
     #using the phase of first harmonics of each segment.
-    for i in range(len(segments)):
+    for i in range(cutoff):
         #Computing the phase folded time
         test_phase_fold = phase_fold(ref_time, segments[i], reg_coeffs)
     #Making the lightcurve using the phase folded time
@@ -411,7 +419,7 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, con
         phases.append(model_phase)
 
     #Plot the pulse profile and the cosine obtained from phase of first "order" harmonic frequencies
-        axs[i].plot(test_lc.time, test_lc.counts, '.')
+        axs[i].errorbar(test_lc.time, test_lc.counts, yerr = np.sqrt(test_lc.counts), fmt='.')
         axs[i].plot(test_lc.time, model)
         if i%4 != 0:
             axs[i].set_yticklabels([])
@@ -465,7 +473,7 @@ def Plot_phases(order, xdata, phase_list):
     return 
 
 
-def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
+def segment_energywise(time_data, energy_data, nmin, nmax, nbin, SNR=False, SNR_freq=0, SNR_dt=0.01, target_SNR=50):
     '''
     Function to segment the event arrival times depending on their energy levels, 
     considering events between a certain range of energies.
@@ -477,12 +485,40 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     :param nmax: float, maximum energy to consider.
     :param nbin: int, number of segments we want to make. If nbin<0 we use a logarithmic segmentation.
     If nbin>0 we use a linear segmentation.
+    :param SNR: bool, telling us whether we want an adaptive binning depending on the SNR or not.
+    :param SNR_freq: float, frequency to use for the phase folding in the SNR calculator.   
+    :param SNR_dt: float, value used in the making of a Lightcurve with Stingray. This is used in the
+    SNR calculator.
+    :param target_SNR: float, SNR value we want each bin to have if we use an SNR adaptive binning.
     Returns
+    bins_time: nested lists in the SNR case, containing the times associated to the energies of the segments.
+    bins: nest lists in the SNR case, containing the energies for the segments.
     energy_time_segments: nested lists, containing the times associated to
     the energies for nbin segments.
     energy_segments: nested lists, containing the energies for nbin segments in increasing energy order.
     ----------
     '''
+    
+    def SNR_calculator(time_data, energy_data, freq, dt):
+        '''
+        Function to segment the event arrival times depending on their energy levels, 
+        considering events between a certain range of energies.
+        Parameters
+        ----------
+        :param time_data: array_like, containing event arrival times (with orbital correction).
+        :param energy_data: array_like, containing event associated to event arrival times.
+        :param dt: float, value used in the making of a Lightcurve with Stingray.
+        :param freq: float, frequency to use for the phase folding.
+        Returns
+        SNR: Signal-to-Noise ratio.
+        ----------
+        '''
+        mphase_fold = phase_fold(time_data[0], time_data, freq)
+        lc = Lightcurve.make_lightcurve(mphase_fold, dt)
+        S = np.sum(lc.counts)
+        N = np.sqrt(S)
+        return S/N
+    
     #Differentiating the cases depending on sign of nbin.
     #For both cases we create a list of boundaries we will use to create the energy
     #segments.
@@ -491,32 +527,54 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     else:
         bins = np.linspace(nmin, nmax, nbin+1)
 
+    if not SNR:
     #Initiating time and energy segments' lists to populate them in the next step.
-    energy_time_segments = []
-    energy_time_segment = []
-    energy_segments = []
-    energy_segment = []
-    if nbin<0:
-        for i in range(np.abs(nbin)):
-            for j in range(len(energy_data)):
-                if bins[i] < energy_data[j] < bins[i+1]:
-                    energy_segment.append(energy_data[j]*4e-2)
-                    energy_time_segment.append(time_data[j])
-            energy_segments.append(energy_segment)
-            energy_time_segments.append(energy_time_segment)
-            energy_time_segment=[]
-            energy_segment=[]
-    else: 
-        for i in range(nbin):
-            for j in range(len(energy_data)):
-                if bins[i] < energy_data[j] < bins[i+1]:
-                    energy_segment.append(energy_data[j]*4e-2)
-                    energy_time_segment.append(time_data[j])
-            energy_segments.append(energy_segment)
-            energy_time_segments.append(energy_time_segment)
-            energy_time_segment=[]
-            energy_segment=[]
-    return energy_time_segments, energy_segments
+        energy_time_segments = []
+        energy_time_segment = []
+        energy_segments = []
+        energy_segment = []
+        if nbin<0:
+            for i in range(np.abs(nbin)):
+                for j in range(len(energy_data)):
+                    if bins[i] < energy_data[j] < bins[i+1]:
+                        energy_segment.append(energy_data[j]*4e-2)
+                        energy_time_segment.append(time_data[j])
+                energy_segments.append(energy_segment)
+                energy_time_segments.append(energy_time_segment)
+                energy_time_segment=[]
+                energy_segment=[]
+        else: 
+            for i in range(nbin):
+                for j in range(len(energy_data)):
+                    if bins[i] < energy_data[j] < bins[i+1]:
+                        energy_segment.append(energy_data[j]*4e-2)
+                        energy_time_segment.append(time_data[j])
+                energy_segments.append(energy_segment)
+                energy_time_segments.append(energy_time_segment)
+                energy_time_segment=[]
+                energy_segment=[]
+           
+    if SNR:
+        bins_energy = []
+        bins_time = []
+        SNRs=[]
+        important_ind=[0]
+        for i in range(10, len(time_data), 500):
+            SNRs.append(SNR_calculator(time_data[:i], energy_data[:i], SNR_freq, SNR_dt))
+            print(i, SNR_calculator(time_data[:i], energy_data[:i], SNR_freq, SNR_dt))
+            
+        for i in range(len(SNRs)):
+            if SNRs[i]%50<1 or -SNRs[i]%50<1:
+                print(SNRs[i])
+                important_ind.append(10+500*i)
+                print('The index in the actual array is:', 10+500*i)
+        for i in range(len(important_ind)):
+            bins_energy.append(energy_data[important_ind[i]:important_ind[i+1]])
+            bins_time.append(time_data[important_ind[i]:important_ind[i+1]])      
+    if SNR:
+        return bins_time, bins
+    else:
+        return energy_time_segments, energy_segments
 
 def bootstrap_generate(counts, k):
     '''
