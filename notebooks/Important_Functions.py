@@ -320,12 +320,12 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, dt=0.01, con
     survival function.
     Returns
     ----------
-    :param orders: list, containing the orders of the sinusoidal functions used 
-    to model each segment's pulse profile
-    :param phases: nested lists, containing all the phases for each segment's pulse profile
-    :param folded_counts: nested lists, containing all the lightcurve counts for each segment's pulse profile
-    :param folded_phases: nested lists, containing all the epoch-folded 
-    lightcurve times for each segment's pulse profile
+    orders: list, containing the orders of the sinusoidal functions used
+        to model each segment's pulse profile
+    phases: nested lists, containing all the phases for each segment's pulse profile
+    folded_counts: nested lists, containing all the lightcurve counts for each segment's pulse profile
+    folded_phases: nested lists, containing all the epoch-folded
+        lightcurve times for each segment's pulse profile
     '''
     
     #Making a function to calculate the order of sinusoidal function to use
@@ -478,9 +478,9 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin):
     :param nbin: int, number of segments we want to make. If nbin<0 we use a logarithmic segmentation.
     If nbin>0 we use a linear segmentation.
     Returns
-    :param energy_time_segments: nested lists, containing the times associated to 
+    energy_time_segments: nested lists, containing the times associated to
     the energies for nbin segments.
-    :param energy_segments: nested lists, containing the energies for nbin segments in increasing energy order.
+    energy_segments: nested lists, containing the energies for nbin segments in increasing energy order.
     ----------
     '''
     #Differentiating the cases depending on sign of nbin.
@@ -556,7 +556,7 @@ def bootstrap_generate(counts, k):
 
 def bootstrap_total(counts, k, func, *args):
     '''
-    Function to calculate the standard deivation of a specific quantity obtained from
+    Function to calculate the standard deviation of a specific quantity obtained from
     the function func.
     Parameters
     ----------
