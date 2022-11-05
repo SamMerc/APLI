@@ -1,0 +1,8 @@
+This is my personal collection of local Xspec models.
+
+ 
+initpackage bwmod model.dat `pwd` 
+hmake
+
+
+
