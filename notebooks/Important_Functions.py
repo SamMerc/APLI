@@ -305,20 +305,26 @@ def model_pulse(order, time, counts):
     return A, phases
 
 
-def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0.01, confi_level=0.1):
+def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0.01, 
+                         confi_level=0.1, error=True, save_img=False, save_img_path='~/'):
     '''
     Function to make and display the pulse profile matrix
     Parameters
     ----------
-    :param segments: array_like, even arrival time segments used to make the lightcurve
-    :param ref_time: float, reference time used in the epoch folding function
-    :param reg_coeffs: array_like, coefficients used in the epoch folding function 
-    obtained from the regression in Harmonic_funk
-    :param title_str: string, to be used as the main title for the figure
-    :param dt: float, value used in the making of a Lightcurve with Stingray
+    :param segments: array_like, even arrival time segments used to make the lightcurve.
+    :param ref_time: float, reference time used in the epoch folding function.
+    :param reg_coeffs: array_like, coefficients used in the epoch folding function.
+    obtained from the regression in Harmonic_funk.
+    :param title_str: string, to be used as the main title for the figure.
+    :param cutoff: int, the number of segments we want to use.
+    :param dt: float, value used in the making of a Lightcurve with Stingray.
     :param confi_level: float, value used in find_optimal function as the cutoff for the
     survival function.
-    :param cutoff: int, the number of segments we want to use.
+    :param error: bool, True if we want to plot the error bars on each pulse profile.
+    False if not.
+    :param save_img: bool, True if we want to save the pulse profile matrix to a pdf.
+    :param save_img_path: string, corresponding to the path of the pdf we want to save 
+    the pulse profile matrix. Only used if save_img=True.
     Returns
     ----------
     orders: list, containing the orders of the sinusoidal functions used
@@ -419,11 +425,16 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
         phases.append(model_phase)
 
     #Plot the pulse profile and the cosine obtained from phase of first "order" harmonic frequencies
-        axs[i].errorbar(test_lc.time, test_lc.counts, yerr = np.sqrt(test_lc.counts), fmt='.')
+        if error:
+            axs[i].errorbar(test_lc.time, test_lc.counts, yerr = np.sqrt(test_lc.counts), fmt='.')
+        else:
+            axs[i].plot(test_lc.time, test_lc.counts, '.')
         axs[i].plot(test_lc.time, model)
         if i%4 != 0:
             axs[i].set_yticklabels([])
         fig.suptitle(title_str)
+        if save_img:
+            plt.savefig(save_img_path+'PulseProfileMatrix.pdf')
     
     #Returning the order of sinusoidal model used, all the phases for each segment, 
     #the folded counts and times for bootstrapping'''
@@ -471,6 +482,34 @@ def Plot_phases(order, xdata, phase_list):
         plt.legend()
     plt.show()
     return 
+
+
+def segment_timewise(time, n):
+    '''
+    Function to segment the event arrival times chronologically into n segments.
+    Parameters
+    ----------
+    :param time: array_like, containing event arrival times (with orbital correction).
+    :param nbin: int, number of segments we want to make.
+    Returns
+    time_segments: nested lists, containing the chronological times segments.
+    ----------
+    '''
+    #Getting the size of the time array
+    size = len(time)
+    
+    #Getting the size of each segment
+    seg_size = int(size/n)
+    
+    #Creating a list that will contain the time array segments
+    time_segments = []
+    
+    #Populating time_segments
+    for i in range(seg_size):
+        time_segment = np.array(time[i*seg_size:(i+1)*seg_size])
+        time_segments.append(time_segment)
+
+    return time_segments
 
 
 def segment_energywise(time_data, energy_data, nmin, nmax, nbin, SNR=False, SNR_freq=0, SNR_dt=0.01, target_SNR=50):
@@ -539,8 +578,8 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin, SNR=False, SNR_
                     if bins[i] < energy_data[j] < bins[i+1]:
                         energy_segment.append(energy_data[j]*4e-2)
                         energy_time_segment.append(time_data[j])
-                energy_segments.append(energy_segment)
-                energy_time_segments.append(energy_time_segment)
+                energy_segments.append(np.array(energy_segment))
+                energy_time_segments.append(np.array(energy_time_segment))
                 energy_time_segment=[]
                 energy_segment=[]
         else: 
@@ -549,8 +588,8 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin, SNR=False, SNR_
                     if bins[i] < energy_data[j] < bins[i+1]:
                         energy_segment.append(energy_data[j]*4e-2)
                         energy_time_segment.append(time_data[j])
-                energy_segments.append(energy_segment)
-                energy_time_segments.append(energy_time_segment)
+                energy_segments.append(np.array(energy_segment))
+                energy_time_segments.append(np.array(energy_time_segment))
                 energy_time_segment=[]
                 energy_segment=[]
            
@@ -688,3 +727,61 @@ def RMS_calculator(counts, k):
     
     #CF you were summing all harmonics, before, not just the first "k"
     return RMS
+
+
+#Note: the below function is used with Renkulab and as a result works with model 
+#instances from xspec and pyxmmas!
+def BIC_calc(chi2, n_spectra):
+    '''
+    Function to calculate the Bayesian Imformation Criterion (BIC)
+    given the chi-squared for our model. 
+    Parameters
+    ----------
+    :param chi2: float, chi-squared value to calcule the BIC for.
+    Returns
+    ----------
+    BIC: float, BIC value.
+    '''
+ 
+    #Initialize the number of data points used
+    n=0
+    #Initialize the number of free parameters used 
+    k=0
+    
+    #Summing the number of data points of each 
+    #individual spectra
+    for i in range(1, n_spectra+1):
+        n += len(xspec.AllData(i).noticed)
+
+    #Get the models for each spectra
+    models = [xspec.AllModels(j) for j in range(1, n_spectra + 1)]
+
+    #Make a function to get the number of free parameters
+    def get_frozen(nn):
+        '''
+        Function to calculate the number of free parameters. 
+        Parameters
+        ----------
+        :param nn: object, model for a spectra
+        Returns
+        ----------
+        k: int, number of free parameters
+        '''
+        #Initializing k
+        k=0
+        #Iterating over the components of the model
+        for i in nn.componentNames:
+            #Iterating over the parameters of each component
+            for j in getattr(nn,i).parameterNames:
+                #If the parameters are frozen, the output is True
+                #So we add to the sum when the output is False
+                if not getattr(getattr(nn,i), j).frozen:
+                    k+=1
+        return k
+
+    #Getting the total number of free parameters for all the spectra used
+    for i in range(n_spectra):
+        k+=get_frozen(models[i])
+        
+    #Return the BIC
+    return chi2 + k*np.log(n)
