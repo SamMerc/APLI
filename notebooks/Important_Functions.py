@@ -63,16 +63,18 @@ def get_orbital_correction(data_file, param_file_name):
     
     return correct_orbit_time
 
-def get_pulse_freq(f_min, f_max, N, correct_time_array, GTI, seg_size):
+def get_pulse_freq(N, correct_time_array, energy_array, distance, GTI, seg_size):
     '''
     Function to get the pulse frequency using the event arrival times with orbital correction.
     Parameters
     ----------
-    :param f_min: float, the low end of range of frequencies we want to test.
-    :param f_max: float, the high end of range of frequencies we want to test.
     :param N: int, the number of frequencies to test between f_min and f_max.
     :param correct_time_array: array, containing the source's event arrival times 
     with orbital correction.
+    :param energy_array: array, containing the source's energy values corresponding to
+    the event arrival times.
+    :param distance: float, how far away from the periodogram best frequency to probe 
+    in the epoch-folding algorithm.
     :param GTI: array, containing the GTI obtained from get_GTIs function.
     :param seg_size: int, length of segments to to be averaged in periodogram.
     Returns
@@ -84,45 +86,19 @@ def get_pulse_freq(f_min, f_max, N, correct_time_array, GTI, seg_size):
     #Defining frequencies to try - required for epoch_folding_search
     #Can either take a large range but then the resolution is low
     #Or small range with high resolution -> could maybe do this iteratively
+    f_temp, power_temp = LombScargle(correct_time_array, energy_array).autopower()
+    f_min = f_temp[np.argmax(power_temp)] - distance
+    f_max = f_temp[np.argmax(power_temp)] + distance
     trial_freqs = np.linspace(f_min, f_max, N)
     
     #Getting the power as a function of frequency from 1. the event arrival times and 
     #2. the event arrival times with orbital correction to show the difference
     correct_L = epoch_folding_search(correct_time_array, trial_freqs, 
                                      segment_size=seg_size, gti=GTI)
-    
+        
     best_freq = correct_L[0][np.argmax(correct_L[1])]
     
     return correct_L, best_freq
-
-
-def segment_time(PI_data, correct_time, N):
-    '''
-    Function to make N segments from the event arrival times and PI energies.
-    Parameters
-    ----------
-    :param PI_data: array, containing the energy (PI) data for each event arrival time.
-    :param correct_time: array, containing the event arrival times with orbital correction.
-    :param N: int, the number of segments to make.
-    Returns
-    ----------
-    :param Time_segments: nested lists, containing N segments of event arrival times.
-    :param PI_segments: nested lists, containing N segments of energy corresponding to the event arrival time. 
-    '''
-    #We get the size of bins to use
-    seg_size = int(len(correct_time)/N)
-    
-    #Making lists that will contain the N segments of time and PI data.
-    #We extract the PI data to get the periodogram for each segment.
-    Time_segments = []
-    PI_segments = []
-
-    #Populating the time and PI segment lists
-    for i in range(N):
-        Time_segments.append(correct_time[seg_size*i:seg_size*(i+1)])
-        PI_segments.append(PI_data[seg_size*i:seg_size*(i+1)])
-    return Time_segments, PI_segments
-
 
 def get_power_and_freq(time_segments, energy_segments, n):
     '''
@@ -286,12 +262,12 @@ def model_pulse(order, time, counts):
     
     #Fourier transform the pulse profiles
     counts_fft = np.fft.rfft(counts)
-    
+
     #Get the phase and amplitudes from Fourier transformed pulse profiles
     phases = np.arctan2(counts_fft.imag, counts_fft.real)
     amplitudes = np.sqrt(counts_fft.imag**2 + counts_fft.real**2)
     
-    
+
     #Getting the sinusoidal model
     base_phi = 2*np.pi*time
     A = 0.5*counts_fft.real[0]
@@ -300,7 +276,6 @@ def model_pulse(order, time, counts):
         
     #Normalizing it
     A = A/len(counts_fft)
-    
     #Return model and all the phases (useful for later)
     return A, phases
 
@@ -371,7 +346,9 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
             n=i
             if chi2.sf(chisq, free_deg) > conf_level:
                 break
-        #print(np.diff(SFs))
+
+        #We instore a failsafe system in case the survival function never reaches 
+        #the confidence level provided
         if n==int(len(counts)/2)-1 or n>10:
             for i in range(len(np.diff(SFs))):
                 if np.diff(SFs)[i]<0:
@@ -379,6 +356,11 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
                     break
             print('Warning: Did not find an order that satisfies the confidence level, '
                   'failsafe system implements:', n, 'with SF=', SFs[n])
+            
+        #Most pulse profiles are poorly described by a single sinusoid
+        #but a 2nd order sinusoidal model is much better. 
+        #As a result, if our failsafe system or normal optimization system
+        #returns n=1, we ensure that the order is instead swapped to n=2.
         if n==1:
             n=2        
         return n
@@ -435,7 +417,9 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
         fig.suptitle(title_str)
         if save_img:
             plt.savefig(save_img_path+'PulseProfileMatrix.pdf')
-    
+    axs[-1].set_yticklabels([])
+    fig.supxlabel('Pulse Phase')
+    fig.supylabel('Photon counts')
     #Returning the order of sinusoidal model used, all the phases for each segment, 
     #the folded counts and times for bootstrapping'''
     return orders, phases, folded_counts, folded_phases
