@@ -100,33 +100,6 @@ def get_pulse_freq(N, correct_time_array, energy_array, distance, GTI, seg_size)
     
     return correct_L, best_freq
 
-def get_power_and_freq(time_segments, energy_segments, n):
-    '''
-    Function to get the power and frequency from the Lomb-Scargle Periodogram
-    of the event arrival times array and corresponding energy array.
-    Parameters
-    ----------
-    :param time_segments: array_like, event arrival times
-    :param energy_segments: array_like, energy associated to event arrival times (in PI)
-    :param n: int, number of segments we consider (useful for the pulse profile matrix)
-    Returns
-    ----------
-    :param freq_segments: array, containing frequencies of the Lomb-Scargle Periodogram
-    :param Power_segments: array, containing powers associated to each frequency of the Lomb-Scargle Periodogram
-    '''
-    
-    #Defining the lists that will contain frequency and power values
-    freq_segments=[]
-    Power_segments=[]
-    
-    #Populating the list
-    for i in range(n):
-        freq_temp, power_temp = LombScargle(time_segments[i], energy_segments[i]).autopower()
-        freq_segments.append(freq_temp)
-        Power_segments.append(power_temp)   
-    return freq_segments, Power_segments
-
-
 def Harmonic_funk(order_fit, limit, ref_time, time_segments, freq_segments, power_segments, guess_frequency):
     '''
     Function to get the first harmonic frequencies for each segment.
@@ -425,49 +398,6 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
     return orders, phases, folded_counts, folded_phases
 
 
-def Plot_phases(order, xdata, phase_list):
-    '''
-    Function to plot the phases for each segment. We differentiate 
-    the different order harmonics by different colors. 
-    Parameters
-    ----------
-    :param order: int, order of the sinusoidal model used corresponding to the number of harmonics used
-    :param xdata: array_like, data used for plotting. By convention we use the average time 
-    per segment with respect to the start of observations. See output of Harmonic_funk.
-    :param phase_list: array_like, list of all the phases for every segment's pulse profile. 
-    See output of pulse_profile_matrix.
-    Returns
-    ----------
-    No returns. Outputs a plot of the phases of harmonics used by each segment,
-    distinguishing the different order of harmonics used.
-    '''
-    
-    #Making lists containing the phases we only care about i.e. the ones used in the sinusoidal model
-    relevant_phases=[]
-    temp=[]
-    
-    #We make a small double nested for loop to extract the phases
-    #we actually used to make our model
-    
-    for i in range(order):
-        for j in range(len(phase_list)):
-        #Don't forget to increment by one the phase we extract
-        #because the first value in each list of phases is always 0
-            temp.append(phase_list[j][i+1])
-        relevant_phases.append(temp)
-        temp=[]
-    
-    #Make n plots for the n phases used in our n-order sinusoidal model 
-    for i in range(order):
-        plt.plot(xdata, relevant_phases[i], '.', label=str(i)+'th phase')
-        plt.ylabel('Phase')
-        plt.xlabel('Average time per segment')
-        plt.title('Plot of the first '+str(order)+' harmonics\' phases')
-        plt.legend()
-    plt.show()
-    return 
-
-
 def segment_timewise(time, n):
     '''
     Function to segment the event arrival times chronologically into n segments.
@@ -664,23 +594,6 @@ def bootstrap_total(counts, k, func, *args):
     # at the end of Day3.ipynb are smaller.
     return std
 
-def get_first_harmonic_phase(counts):
-    '''
-    Function to calculate the phase of the first harmonic frequency for a given pulse profile.
-    Parameters
-    ----------
-    :param counts: array_like, containing the lightcurve counts for a given pulse profile
-    Returns
-    ----------
-    :param phase_l: float, phase of the first harmonic frequency for the given pulse profile.
-    '''
-    #Calculating the phases for the lightcurve counts using the Fourier transform
-    #and taking the first element of the list of phases (technically the second element
-    #because the very first phase is always 0).
-    fft = np.fft.rfft(counts)
-    phase_l = np.arctan2(fft.imag, fft.real)[1]
-    return phase_l
-
 def RMS_calculator(counts, k):
     '''
     Function to calculate the Root-Mean Squared (RMS) for a given pulse profile.
@@ -712,6 +625,34 @@ def RMS_calculator(counts, k):
     #CF you were summing all harmonics, before, not just the first "k"
     return RMS
 
+def plot_time_vs_phase(time_array, model_phases, save_img, save_img_path):
+    '''
+    Function to plot the first harmonic phase for each pulse profile
+    in the pulse profile matrix, as a function of time
+    Parameters
+    ----------
+    :param time_array: array, event arrival times used for each pulse profile in 
+    the matrix.
+    :param model_phases: array, all harmonic phases of each pulse profile in 
+    the matrix.
+    :param save_img: bool, True if we want to save the plot to a pdf.
+    :param save_img_path: string, corresponding to the path of the pdf we want to save 
+    the plot. Only used if save_img=True.
+    Returns
+    ----------
+    Plot of Phase against Time.
+    '''
+    zero_harmonics = [model_phases[i][1] for i in range(len(model_phases))]
+    times = [np.mean(time_array[i] - time_array[0][0]) for i in range(len(model_phases))]
+    
+    plt.plot(times, zero_harmonics, '.')
+    plt.xlabel('Time')
+    plt.ylabel('Phase')
+    plt.title('Plot of the first harmonic phase against time')
+    if save_img:
+            plt.savefig(save_img_path+'TimePhase.pdf')
+    plt.show()
+    return 
 
 #Note: the below function is used with Renkulab and as a result works with model 
 #instances from xspec and pyxmmas!
