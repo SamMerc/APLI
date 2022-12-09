@@ -11,7 +11,7 @@ import statistics
 from scipy.stats import chi2
 from stingray.pulse import epoch_folding_search
 from stingray.pulse import get_orbital_correction_from_ephemeris_file
-
+import lmfit as lf
 
 def get_GTIs(data_file):
     '''
@@ -63,13 +63,20 @@ def get_orbital_correction(data_file, param_file_name):
     
     return correct_orbit_time
 
-def get_pulse_freq(N, correct_time_array, energy_array, distance, GTI, seg_size):
+def get_pulse_freq(N, correct_time_array, big_energy_array, use_single, time_array, energy_array, distance, GTI, seg_size, cutoff):
     '''
     Function to get the pulse frequency using the event arrival times with orbital correction.
     Parameters
     ----------
     :param N: int, the number of frequencies to test between f_min and f_max.
-    :param correct_time_array: array, containing the source's event arrival times 
+    :param correct_time_array: array, containing the source's concatenated event arrival times 
+    with orbital correction.
+    :param big_energy_array: array, containing the source's concatenated energy values corresponding to
+    the event arrival times.
+    :param use_single: bool, whether to use to concatenated data or data from a single detector. 
+    This is particularly useful for large datasets (such as Cen X-3) to reduce periodogram computation
+    time.
+    :param time_array: array, containing the source's event arrival times 
     with orbital correction.
     :param energy_array: array, containing the source's energy values corresponding to
     the event arrival times.
@@ -77,6 +84,9 @@ def get_pulse_freq(N, correct_time_array, energy_array, distance, GTI, seg_size)
     in the epoch-folding algorithm.
     :param GTI: array, containing the GTI obtained from get_GTIs function.
     :param seg_size: int, length of segments to to be averaged in periodogram.
+    :param cutoff: float, frequency delimiting the low frequency tail of the periodogram for
+    which the power is too high. We are interested in the high frequency regime where the harmonics
+    can be found.
     Returns
     ----------
     :param correct_L: tuple list, containing a list of frequencies and a list of corresponding power.
@@ -86,11 +96,15 @@ def get_pulse_freq(N, correct_time_array, energy_array, distance, GTI, seg_size)
     #Defining frequencies to try - required for epoch_folding_search
     #Can either take a large range but then the resolution is low
     #Or small range with high resolution -> could maybe do this iteratively
-    f_temp, power_temp = LombScargle(correct_time_array, energy_array).autopower()
-    f_min = f_temp[np.argmax(power_temp)] - distance
-    f_max = f_temp[np.argmax(power_temp)] + distance
+    print('Starting periodogram')
+    if use_single:
+        f_temp, power_temp = LombScargle(time_array, energy_array).autopower()
+    else:
+        f_temp, power_temp = LombScargle(correct_time_array, big_energy_array).autopower()
+    f_min = f_temp[np.argmax(power_temp[f_temp>cutoff])] - distance
+    f_max = f_temp[np.argmax(power_temp[f_temp>cutoff])] + distance
     trial_freqs = np.linspace(f_min, f_max, N)
-    
+    print('Finished periodogram step, now using Epoch-Folding Search around frequencies [', f_min, ',', f_max,']')
     #Getting the power as a function of frequency from 1. the event arrival times and 
     #2. the event arrival times with orbital correction to show the difference
     correct_L = epoch_folding_search(correct_time_array, trial_freqs, 
@@ -327,14 +341,20 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
                 if np.diff(SFs)[i]<0:
                     n=i
                     break
+                else:
+                    #We implement this in case np.diff has no negative values
+                    #and the first value of np.diff is the lowest -> which is 
+                    #sometimes the case
+                    n = np.diff(SFs).tolist().index(min(np.diff(SFs)[1:]))
             print('Warning: Did not find an order that satisfies the confidence level, '
                   'failsafe system implements:', n, 'with SF=', SFs[n])
+            
             
         #Most pulse profiles are poorly described by a single sinusoid
         #but a 2nd order sinusoidal model is much better. 
         #As a result, if our failsafe system or normal optimization system
         #returns n=1, we ensure that the order is instead swapped to n=2.
-        if n==1:
+        if n<=1:
             n=2        
         return n
     
@@ -387,12 +407,13 @@ def pulse_profile_matrix(segments, ref_time, reg_coeffs, title_str, cutoff, dt=0
         axs[i].plot(test_lc.time, model)
         if i%4 != 0:
             axs[i].set_yticklabels([])
-        fig.suptitle(title_str)
-        if save_img:
-            plt.savefig(save_img_path+'PulseProfileMatrix.pdf')
+        fig.suptitle(title_str, y=0.92)
     axs[-1].set_yticklabels([])
-    fig.supxlabel('Pulse Phase')
-    fig.supylabel('Photon counts')
+    fig.supxlabel('Pulse Phase', y=0.07)
+    fig.supylabel('Photon counts', x=0.07)
+    
+    if save_img:
+            plt.savefig(save_img_path+'PulseProfileMatrix.pdf')
     #Returning the order of sinusoidal model used, all the phases for each segment, 
     #the folded counts and times for bootstrapping'''
     return orders, phases, folded_counts, folded_phases
@@ -627,7 +648,7 @@ def RMS_calculator(counts, k):
 
 def plot_time_vs_phase(time_array, model_phases, save_img, save_img_path):
     '''
-    Function to plot the first harmonic phase for each pulse profile
+    Function to plot the first and second harmonic phase for each pulse profile
     in the pulse profile matrix, as a function of time
     Parameters
     ----------
@@ -642,17 +663,38 @@ def plot_time_vs_phase(time_array, model_phases, save_img, save_img_path):
     ----------
     Plot of Phase against Time.
     '''
-    zero_harmonics = [model_phases[i][1] for i in range(len(model_phases))]
+    def quadratic(x, a, b, c):
+        return a*x**2 + b*x + c
+    
+    mod = lf.Model(quadratic)
+       
+    first_harmonics = [model_phases[i][1] for i in range(len(model_phases))]
+    second_harmonics = [model_phases[i][2] for i in range(len(model_phases))]
     times = [np.mean(time_array[i] - time_array[0][0]) for i in range(len(model_phases))]
     
-    plt.plot(times, zero_harmonics, '.')
-    plt.xlabel('Time')
-    plt.ylabel('Phase')
-    plt.title('Plot of the first harmonic phase against time')
+    results_1 = mod.fit(np.array(first_harmonics), x=times, a=1, b=1, c=1)
+    results_2 = mod.fit(np.array(second_harmonics), x=times,  a=1, b=1, c=1)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 4), sharey=True)
+    fig.tight_layout()
+    
+    ax1.plot(times, first_harmonics, '.')
+    ax1.plot(times, results_1.best_fit, 'r')
+    ax2.plot(times, second_harmonics, '.')
+    ax2.plot(times, results_2.best_fit, 'r')
+    ax1.set_xlabel('Time (s)')
+    ax2.set_xlabel('Time (s)')
+    ax1.set_ylabel('Phase')
+    ax1.set_title('First Harmonic Phase')
+    ax2.set_title('Second Harmonic Phase')
     if save_img:
-            plt.savefig(save_img_path+'TimePhase.pdf')
+            plt.savefig(save_img_path+'TimePhase.pdf', bbox_inches='tight')
     plt.show()
-    return 
+ 
+    first_bestfit_params = [results_1.params['a'].value, results_1.params['b'].value, results_1.params['c'].value]  
+    second_bestfit_params = [results_2.params['a'].value, results_2.params['b'].value, results_2.params['c'].value]  
+
+    return first_bestfit_params, second_bestfit_params
 
 #Note: the below function is used with Renkulab and as a result works with model 
 #instances from xspec and pyxmmas!
