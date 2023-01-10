@@ -244,7 +244,7 @@ def segment_timewise(time, n):
     return time_segments
 
 
-def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, concatenation=False):
+def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, load_bins, concatenation=False, load=False):
     '''
     Function to segment the event arrival times depending on their energy levels, 
     considering events between a certain range of energies.
@@ -257,6 +257,10 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, conc
     :param nbin: int, number of segments we want to make. If nbin<0 we use a logarithmic segmentation.
     If nbin>0 we use a linear segmentation.
     :param threshold: int, reference length of the segments that we want. Used for logarithmic binning.
+    :param load_bins: array, manually built bins that can be used to segment the data.
+    :param concatenation: bool, True if you want to concatenate the segments such that they all have
+    a minimum number of points, obtained from threshold parameter.
+    :param load: bool, whether to use the loaded bins or not.
     Returns
     ----------
     energy_time_segments: nested lists, containing the times associated to
@@ -264,98 +268,126 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, conc
     energy_segments: nested lists, containing the energies for nbin segments in increasing energy order.
     '''
     
-    #Differentiating the cases depending on sign of nbin.
+    #Differentiating the cases depending on sign of nbin, and on whether or not 
+    #the bins are loaded manually.
     #For both cases we create a list of boundaries we will use to create the energy
     #segments.
-    if nbin<0:
-        bins = 10**(np.linspace(np.log10(nmin), np.log10(nmax), np.abs(nbin)+1))
-    else:
-        bins = np.linspace(nmin, nmax, nbin+1)
+    if not load:
+        if nbin<0:
+            bins = 10**(np.linspace(np.log10(nmin), np.log10(nmax), np.abs(nbin)+1))
+        else:
+            bins = np.linspace(nmin, nmax, nbin+1)
 
-    #Initializing time and energy segments lists to populate them in the next step.
+        #Initializing time and energy segments lists to populate them in the next step.
+        
+        #The energy_time_segments and energy_segments will contain energy_time_segment and
+        #energy_segment lists.
+        energy_time_segments = []
+        energy_time_segment = []
+        energy_segments = []
+        energy_segment = []
     
-    #The energy_time_segments and energy_segments will contain energy_time_segment and
-    #energy_segment lists.
-    energy_time_segments = []
-    energy_time_segment = []
-    energy_segments = []
-    energy_segment = []
+        #If we have logarithmic bins.
+        if nbin<0:
+            #Loop over the bins.
+            for i in range(np.abs(nbin)):
+                #Loop over the data.
+                for j in range(len(energy_data)):
+                    #Check if the data falls in the bins - if so, add to the subsegments.
+                    if bins[i] < energy_data[j] < bins[i+1]:
+                        energy_segment.append(energy_data[j])
+                        energy_time_segment.append(time_data[j])
+                #Append the subsegments to our master list.
+                energy_segments.append(np.array(energy_segment))
+                energy_time_segments.append(np.array(energy_time_segment))
+                energy_time_segment=[]
+                energy_segment=[]
+            
+            #We implement a routine to concatenate the lists that contain 
+            # a low number of events - this is done to improve the building 
+            #of pulse profiles at high-energies as the number of photon counts
+            #decreases exponentially in those regimes.
+            if concatenation:
+                #Initialize a new list of segments and sublists for each segment.
+                new_segments = []
+                new_segments_t = []
+                #Initializing the index to go through the master list of energy segments made prior.
+                i=0
+                #Iterating over all the segments - if the size of the sub-segments are below a 
+                #reference value, we concatenate them together.
+                while i<len(energy_segments):
+                
+                    new_segment = energy_segments[i]
+                    new_segment_t = energy_time_segments[i]
+                    j=i
+            
+                    #Concatenating until the size of the subsegment reaches our reference value.
+                    while len(new_segment)<threshold and j<len(energy_segments)-1:
+                        j+=1
+                        new_segment=np.concatenate((new_segment, energy_segments[j]))
+                        new_segment_t=np.concatenate((new_segment_t, energy_time_segments[j]))
     
-    #If we have logarithmic bins.
-    if nbin<0:
-        #Loop over the bins.
-        for i in range(np.abs(nbin)):
-            #Loop over the data.
-            for j in range(len(energy_data)):
-                #Check if the data falls in the bins - if so, add to the subsegments.
-                if bins[i] < energy_data[j] < bins[i+1]:
-                    energy_segment.append(energy_data[j])
-                    energy_time_segment.append(time_data[j])
-            #Append the subsegments to our master list.
-            energy_segments.append(np.array(energy_segment))
-            energy_time_segments.append(np.array(energy_time_segment))
-            energy_time_segment=[]
-            energy_segment=[]
-            
-        #We implement a routine to concatenate the lists that contain 
-        # a low number of events - this is done to improve the building 
-        #of pulse profiles at high-energies as the number of photon counts
-        #decreases exponentially in those regimes.
-        if concatenation:
-            #Initialize a new list of segments and sublists for each segment.
-            new_segments = []
-            new_segments_t = []
-            #Initializing the index to go through the master list of energy segments made prior.
-            i=0
-            #Iterating over all the segments - if the size of the sub-segments are below a 
-            #reference value, we concatenate them together.
-            while i<len(energy_segments):
-            
-                new_segment = energy_segments[i]
-                new_segment_t = energy_time_segments[i]
-                j=i
-            
-                #Concatenating until the size of the subsegment reaches our reference value.
-                while len(new_segment)<threshold and j<len(energy_segments)-1:
-                    j+=1
-                    new_segment=np.concatenate((new_segment, energy_segments[j]))
-                    new_segment_t=np.concatenate((new_segment_t, energy_time_segments[j]))
+                    i=j+1
+                    #Adding our subsegments to the corresponding master list.
+                    new_segments.append(new_segment)
+                    new_segments_t.append(new_segment_t)
 
-                i=j+1
-                #Adding our subsegments to the corresponding master list.
-                new_segments.append(new_segment)
-                new_segments_t.append(new_segment_t)
+                #The last segment is skipped in our iteration and is generally the one
+                #that suffers the most from decrease in photon counts. 
+                #To double-check this, we check the size of the last segment. If it is indeed
+                #lower than our reference value, we concatenate it to the second-to-last segment.
+                if len(new_segments[-1])<threshold:
+                    new_segments[-2]=np.concatenate((new_segments[-2], new_segments[-1]))
+                    new_segments = new_segments[:-1]
 
-            #The last segment is skipped in our iteration and is generally the one
-            #that suffers the most from decrease in photon counts. 
-            #To double-check this, we check the size of the last segment. If it is indeed
-            #lower than our reference value, we concatenate it to the second-to-last segment.
-            if len(new_segments[-1])<threshold:
-                new_segments[-2]=np.concatenate((new_segments[-2], new_segments[-1]))
-                new_segments = new_segments[:-1]
-
-                new_segments_t[-2]=np.concatenate((new_segments_t[-2], new_segments_t[-1]))
-                new_segments_t = new_segments_t[:-1]
+                    new_segments_t[-2]=np.concatenate((new_segments_t[-2], new_segments_t[-1]))
+                    new_segments_t = new_segments_t[:-1]
         
             #Updating the master lists.
-            energy_time_segments = new_segments_t
-            energy_segments = new_segments
+                energy_time_segments = new_segments_t
+                energy_segments = new_segments
         
-    #If we have linear bins.
-    else: 
+        #If we have linear bins.
+        else: 
+            #Loop over the bins.
+            for i in range(nbin):
+                #Loop ove the data.
+                for j in range(len(energy_data)):
+                    #Check if the data falls in the bins - if so, add to the subsegments.
+                    if bins[i] < energy_data[j] < bins[i+1]:
+                        energy_segment.append(energy_data[j])
+                        energy_time_segment.append(time_data[j])
+                #Append the subsegments to our master list.
+                energy_segments.append(np.array(energy_segment))
+                energy_time_segments.append(np.array(energy_time_segment))
+                energy_time_segment=[]
+                energy_segment=[]
+                
+    #Adding a case if we want to load the bins manually
+    if load:
+        #Initializing time and energy segments lists to populate them in the next step.
+        
+        #The energy_time_segments and energy_segments will contain energy_time_segment and
+        #energy_segment lists.
+        energy_time_segments = []
+        energy_time_segment = []
+        energy_segments = []
+        energy_segment = []
+
         #Loop over the bins.
-        for i in range(nbin):
-            #Loop ove the data.
+        for i in range(len(load_bins)-1):
+           #Loop ove the data.
             for j in range(len(energy_data)):
-                #Check if the data falls in the bins - if so, add to the subsegments.
-                if bins[i] < energy_data[j] < bins[i+1]:
+                    #Check if the data falls in the bins - if so, add to the subsegments.
+                if load_bins[i] < energy_data[j] < load_bins[i+1]:
                     energy_segment.append(energy_data[j])
                     energy_time_segment.append(time_data[j])
-            #Append the subsegments to our master list.
+                #Append the subsegments to our master list.
             energy_segments.append(np.array(energy_segment))
             energy_time_segments.append(np.array(energy_time_segment))
             energy_time_segment=[]
             energy_segment=[]
+        
      
     return energy_time_segments, energy_segments
 
