@@ -244,7 +244,7 @@ def segment_timewise(time, n):
     return time_segments
 
 
-def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, load_bins, concatenation=False, load=False):
+def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, concatenation=False, load_bins=[], load=False):
     '''
     Function to segment the event arrival times depending on their energy levels, 
     considering events between a certain range of energies.
@@ -257,9 +257,9 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, load
     :param nbin: int, number of segments we want to make. If nbin<0 we use a logarithmic segmentation.
     If nbin>0 we use a linear segmentation.
     :param threshold: int, reference length of the segments that we want. Used for logarithmic binning.
-    :param load_bins: array, manually built bins that can be used to segment the data.
     :param concatenation: bool, True if you want to concatenate the segments such that they all have
     a minimum number of points, obtained from threshold parameter.
+    :param load_bins: array, manually built bins that can be used to segment the data.
     :param load: bool, whether to use the loaded bins or not.
     Returns
     ----------
@@ -364,7 +364,7 @@ def segment_energywise(time_data, energy_data, nmin, nmax, nbin, threshold, load
                 energy_segment=[]
                 
     #Adding a case if we want to load the bins manually
-    if load:
+    else:
         #Initializing time and energy segments lists to populate them in the next step.
         
         #The energy_time_segments and energy_segments will contain energy_time_segment and
