@@ -1,4 +1,15 @@
-# AP-Lab-I-2022
+# AP-Lab-I-2022 : Spectral and timing variability of magnetized neutron stars
+Supervisor: Carlo Ferrigno
+
+Magnetized neutron stars accreting from a companion star emit X-ray radiation that is strongly modulated with the spin phase. They are also variables on time scales varying from seconds to months.
+By analyzing the pulsed emission, it is possible to study the emission mechanism and its geometry in the vicinity of the neutron star, where extreme gravity and radiation conditions are present.
+By analyzing the variability on different time scales, it is possible to study how the neutron star interact with the surrounding medium to capture the material to be accreted.
+The student will be asked to familiarize with one or two X-ray facilities and their data format as well as data reduction pipelines. Then, specific tools used for spectral and timing analysis 
+will be applied to the reduced data sets and results visualized using python notebooks. Note that many methods are common to several research fields and can be used beyond the 
+high-energy-astrophysics domain. Even if the student will be asked to contribute to the development of parts of the analysis and visualization tools using standard software versioning, 
+most of the technical details will be mitigated by using software containers and self-developed python packages. 
+The student will be asked to read and summarize research papers and provide a written report of their work that includes a literature review.
+
 
 ## Use with git
 ```bash
