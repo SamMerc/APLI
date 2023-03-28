@@ -18,8 +18,7 @@ HD_LIBRARY_SRC_f90	=
 
 HD_LIBRARY_SRC_f03	= 
 
-HD_LIBRARY_SRC_c	= fdcut.c \
-			  gausabs.c \
+HD_LIBRARY_SRC_c	= gausabs.c \
 			  newhcut.c \
 			  tbvabs.c \
 			  xscompmag.c
